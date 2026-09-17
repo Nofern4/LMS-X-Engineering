@@ -1,0 +1,683 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Users, Search, Shield, CheckCircle, XCircle, ArrowLeft, UserPlus, Edit3, Mail, BookOpen, GraduationCap, ShieldCheck, UserCheck, RefreshCw, AlertCircle, Key, Info, Lock, CheckSquare, Square } from 'lucide-react';
+import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+const ALL_AVAILABLE_ROLES = [
+  {
+    name: 'STUDENT',
+    title: '1. STUDENT - นักเรียน / นักศึกษา',
+    description: 'สิทธิ์เข้าเรียนรายวิชา ส่งงาน รับชมสื่อ และเช็คชื่อเข้าเรียน',
+    badgeVariant: 'success' as const,
+  },
+  {
+    name: 'PROFESSOR',
+    title: '2. PROFESSOR - อาจารย์ / ครูผู้สอน',
+    description: 'สิทธิ์สร้างคอร์สเรียน จัดการบทเรียน ตรวจการบ้าน และเช็คชื่อนักเรียน',
+    badgeVariant: 'bronze' as const,
+  },
+  {
+    name: 'COURSE_CREATOR_APPROVER',
+    title: '3. APPROVER - คนอนุมัติ / ผู้อนุมัติ (อนุมัติเปิดวิชาและอนุมัติสื่อการเรียนรู้)',
+    description: 'สิทธิ์ในการตรวจสอบและพิจารณาอนุมัติหลักสูตร คอร์สเรียน และสื่อการสอนทั้งหมดประจำสถาบัน',
+    badgeVariant: 'warning' as const,
+  },
+  {
+    name: 'REGISTRAR',
+    title: '4. REGISTRAR - นายทะเบียน / เจ้าหน้าที่ลงทะเบียน',
+    description: 'สิทธิ์สูงสุดในการอนุมัติบัญชีผู้ใช้และกำหนดบทบาทบุคลากร',
+    badgeVariant: 'luxury' as const,
+  },
+  {
+    name: 'DIRECTOR',
+    title: '5. DIRECTOR - ผู้อำนวยการ (Read-Only)',
+    description: 'สิทธิ์ผู้บริหารดูภาพรวมสถาบันอย่างเดียว (Read-Only)',
+    badgeVariant: 'danger' as const,
+  },
+];
+
+export default function RegistrarUsersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+
+  const [mounted, setMounted] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [roleStats, setRoleStats] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState(initialSearch);
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Edit Modal State (Multi-Role Assignment)
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [editName, setEditName] = useState<string>('');
+  const [editDepartment, setEditDepartment] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState<string | null>(null);
+
+  // Add User Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newSelectedRoles, setNewSelectedRoles] = useState<string[]>(['PROFESSOR', 'STUDENT']);
+  const [newDepartment, setNewDepartment] = useState('');
+  const [newPassword, setNewPassword] = useState('xkarchang2026');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (editingUser || isAddModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [editingUser, isAddModalOpen]);
+
+  const fetchUsers = () => {
+    setIsLoading(true);
+    const query = new URLSearchParams();
+    if (search) query.set('search', search);
+    if (selectedRoleFilter) query.set('role', selectedRoleFilter);
+
+    fetch(`/api/registrar/users?${query.toString()}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setUsers(d.users || []);
+        if (d.roleStats) setRoleStats(d.roleStats);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [search, selectedRoleFilter]);
+
+  const handleOpenEditModal = (u: any) => {
+    setEditingUser(u);
+    const currentRoles = u.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) || ['STUDENT'];
+    setSelectedRoles(currentRoles);
+    setEditName(u.name);
+    setEditDepartment(u.department || '');
+    setModalError(null);
+    setModalSuccess(null);
+  };
+
+  const handleToggleRoleInEdit = (roleName: string) => {
+    setSelectedRoles((prev) => {
+      if (prev.includes(roleName)) {
+        if (prev.length === 1) {
+          // Keep at least 1 role
+          return prev;
+        }
+        return prev.filter((r) => r !== roleName);
+      } else {
+        return [...prev, roleName];
+      }
+    });
+  };
+
+  const handleToggleRoleInAdd = (roleName: string) => {
+    setNewSelectedRoles((prev) => {
+      if (prev.includes(roleName)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((r) => r !== roleName);
+      } else {
+        return [...prev, roleName];
+      }
+    });
+  };
+
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    if (selectedRoles.length === 0) {
+      setModalError('กรุณาเลือกอย่างน้อย 1 บทบาทสำหรับผู้ใช้งานนี้');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setModalError(null);
+    setModalSuccess(null);
+
+    try {
+      const res = await fetch('/api/registrar/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: editingUser.id,
+          roleNames: selectedRoles,
+          newName: editName,
+          department: editDepartment,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setModalError(data.error || 'เกิดข้อผิดพลาดในการอัปเดตสิทธิ์');
+        return;
+      }
+
+      setModalSuccess(`อัปเดตสิทธิ์ผู้ใช้งานสำเร็จ! สิทธิ์ปัจจุบัน: ${selectedRoles.join(', ')}`);
+      setTimeout(() => {
+        setEditingUser(null);
+        fetchUsers();
+      }, 1000);
+    } catch (err: any) {
+      setModalError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    await fetch('/api/registrar/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUserId: userId,
+        status: newStatus,
+      }),
+    });
+    fetchUsers();
+  };
+
+  const handleCreateNewUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setModalError(null);
+
+    try {
+      const res = await fetch('/api/registrar/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          email: newEmail,
+          roleNames: newSelectedRoles,
+          department: newDepartment,
+          password: newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setModalError(data.error || 'เกิดข้อผิดพลาดในการสร้างบัญชี');
+        return;
+      }
+
+      setIsAddModalOpen(false);
+      setNewName('');
+      setNewEmail('');
+      setNewDepartment('');
+      setNewPassword('xkarchang2026');
+      fetchUsers();
+    } catch (err: any) {
+      setModalError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getRoleBadgeVariant = (roleName: string) => {
+    switch (roleName) {
+      case 'REGISTRAR': return 'luxury' as const;
+      case 'PROFESSOR': return 'bronze' as const;
+      case 'COURSE_CREATOR_APPROVER': return 'warning' as const;
+      case 'CONTENT_APPROVER': return 'info' as const;
+      case 'DIRECTOR': return 'danger' as const;
+      case 'STUDENT': default: return 'success' as const;
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn font-sans text-slate-900 pb-16">
+      
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/registrar')}
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-xs"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-6 h-6 text-black" />
+              <span>ศูนย์มอบสิทธิ์หลายบทบาท (Multi-Role Assignment Center)</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+              สำหรับนายทะเบียน: สามารถเลือกมอบหลายบทบาทให้ผู้ใช้งานถือครองสิทธิ์พร้อมกันได้ (เช่น อาจารย์ถือสิทธิ์ PROFESSOR + STUDENT)
+            </p>
+          </div>
+        </div>
+
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => {
+            setIsAddModalOpen(true);
+            setModalError(null);
+          }}
+          className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold rounded-xl text-xs sm:text-sm shadow-sm"
+          leftIcon={<UserPlus className="w-4 h-4 text-black" />}
+        >
+          เพิ่มบุคลากร / ครูใหม่
+        </Button>
+      </div>
+
+      {/* Role Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setSelectedRoleFilter('')}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+            selectedRoleFilter === ''
+              ? 'bg-black text-[#CEF34B] shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          ทั้งหมด ({users.length})
+        </button>
+        <button
+          onClick={() => setSelectedRoleFilter('STUDENT')}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+            selectedRoleFilter === 'STUDENT'
+              ? 'bg-black text-[#CEF34B] shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          นักเรียน / นักศึกษา (STUDENT)
+        </button>
+        <button
+          onClick={() => setSelectedRoleFilter('PROFESSOR')}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+            selectedRoleFilter === 'PROFESSOR'
+              ? 'bg-black text-[#CEF34B] shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          อาจารย์ / ครู (PROFESSOR)
+        </button>
+        <button
+          onClick={() => setSelectedRoleFilter('COURSE_CREATOR_APPROVER')}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+            selectedRoleFilter === 'COURSE_CREATOR_APPROVER'
+              ? 'bg-black text-[#CEF34B] shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          ผู้อนุมัติรายวิชา (APPROVER)
+        </button>
+        <button
+          onClick={() => setSelectedRoleFilter('REGISTRAR')}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+            selectedRoleFilter === 'REGISTRAR'
+              ? 'bg-black text-[#CEF34B] shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          นายทะเบียน (REGISTRAR)
+        </button>
+      </div>
+
+      {/* Main Users Table Card */}
+      <Card className="border-slate-200 shadow-sm bg-white">
+        <CardHeader className="bg-slate-50/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 p-4">
+          <div className="w-full sm:w-80">
+            <Input
+              placeholder="ค้นหาชื่อ, อีเมล หรือสังกัด..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              leftIcon={<Search className="w-4 h-4 text-slate-400" />}
+            />
+          </div>
+          <p className="text-xs sm:text-sm text-slate-600 font-medium">
+            พบผู้ใช้งานในระบบจำนวน <span className="font-bold text-slate-900">{users.length}</span> รายการ
+          </p>
+        </CardHeader>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase tracking-wider text-xs">
+                <th className="p-4 pl-6">ชื่อ-นามสกุล</th>
+                <th className="p-4">อีเมลสถาบัน</th>
+                <th className="p-4">สังกัด / แผนก</th>
+                <th className="p-4">บทบาททั้งหมด (Roles)</th>
+                <th className="p-4">สถานะบัญชี</th>
+                <th className="p-4 pr-6 text-right">การจัดการมอบสิทธิ์</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {users.map((u) => {
+                const userRolesList = u.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) || ['STUDENT'];
+                return (
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 font-bold text-slate-900 text-sm sm:text-base">{u.name}</td>
+                    <td className="p-4 font-mono text-slate-700 text-xs sm:text-sm">{u.email}</td>
+                    <td className="p-4 text-slate-600 text-xs sm:text-sm">{u.department || u.studentId || '-'}</td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {userRolesList.map((rName: string) => (
+                          <Badge
+                            key={rName}
+                            variant={getRoleBadgeVariant(rName)}
+                            size="sm"
+                            className="font-bold text-xs"
+                          >
+                            {rName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} size="sm" className="font-bold text-xs">
+                        {u.status}
+                      </Badge>
+                    </td>
+                    <td className="p-4 pr-6 text-right space-x-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleOpenEditModal(u)}
+                        className="text-xs font-extrabold border-black bg-black text-[#CEF34B] hover:bg-slate-800"
+                        leftIcon={<ShieldCheck className="w-4 h-4 text-[#CEF34B]" />}
+                      >
+                        + เพิ่ม/จัดการสิทธิ์
+                      </Button>
+
+                      {u.status === 'ACTIVE' ? (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleToggleStatus(u.id, u.status)}
+                          className="text-xs font-bold"
+                        >
+                          ระงับสิทธิ์
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => handleToggleStatus(u.id, u.status)}
+                          className="text-xs font-extrabold bg-[#CEF34B] text-black"
+                        >
+                          เปิดใช้งาน
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Multi-Role Assignment Modal (Fullscreen z-[99999] Backdrop Overlay covering 100% of Viewport) */}
+      {mounted && editingUser && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-sans animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-6 h-6 text-black" />
+                <span>เพิ่ม/จัดการสิทธิ์หลายบทบาท (Multi-Role Assignment)</span>
+              </h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="text-slate-400 hover:text-slate-600 text-base font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            {modalSuccess && (
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-black text-[#CEF34B] text-xs sm:text-sm flex items-center gap-2 font-bold">
+                <CheckCircle className="w-5 h-5 flex-shrink-0 text-[#CEF34B]" />
+                <span>{modalSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEditUser} className="space-y-5 text-xs sm:text-sm">
+              {/* User Read-Only Email & Current Role Badges */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">ผู้ใช้งานที่เลือก</p>
+                  <p className="font-bold text-slate-900 text-base">{editingUser.name}</p>
+                  <p className="font-mono text-slate-600 text-xs mt-0.5">{editingUser.email}</p>
+                </div>
+                <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                  {selectedRoles.map((r) => (
+                    <Badge key={r} variant={getRoleBadgeVariant(r)} size="sm">
+                      {r}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Multi-Role Checkboxes Instruction */}
+              <div className="space-y-3">
+                <label className="block font-bold text-slate-900 text-sm flex items-center justify-between">
+                  <span>เลือกระบุบทบาทที่ต้องการมอบให้ถือครอง (ติ๊กเลือกเพิ่มได้หลายบทบาท):</span>
+                  <span className="text-xs text-black font-extrabold bg-[#CEF34B] px-2 py-0.5 rounded-full">เลือกแล้ว {selectedRoles.length} สิทธิ์</span>
+                </label>
+
+                <p className="text-xs text-slate-700 bg-slate-100 p-3 rounded-xl border border-slate-200 leading-relaxed">
+                  💡 <strong>ข้อแนะนำสำหรับนายทะเบียน:</strong> ท่านสามารถติ๊กเลือกมอบสิทธิ์เพิ่มให้ผู้ใช้งานถือครองหลายบทบาทพร้อมกันได้โดยไม่ต้องลบสิทธิ์เดิม (เช่น อาจารย์ถือสิทธิ์ <code>PROFESSOR</code> + <code>STUDENT</code> หรือ คนอนุมัติถือสิทธิ์ <code>COURSE_CREATOR_APPROVER</code> + <code>STUDENT</code>)
+                </p>
+
+                {/* Checkboxes Grid */}
+                <div className="space-y-2.5 pt-1">
+                  {ALL_AVAILABLE_ROLES.map((roleObj) => {
+                    const isChecked = selectedRoles.includes(roleObj.name);
+
+                    return (
+                      <div
+                        key={roleObj.name}
+                        onClick={() => handleToggleRoleInEdit(roleObj.name)}
+                        className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          isChecked
+                            ? 'bg-black border-black text-white shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <div className="mt-0.5">
+                          {isChecked ? (
+                            <CheckSquare className="w-5 h-5 text-[#CEF34B]" />
+                          ) : (
+                            <Square className="w-5 h-5 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className={`font-bold text-sm ${isChecked ? 'text-white' : 'text-slate-900'}`}>{roleObj.title}</span>
+                            <Badge variant={roleObj.badgeVariant} size="sm">
+                              {roleObj.name}
+                            </Badge>
+                          </div>
+                          <p className={`text-xs mt-1 leading-normal ${isChecked ? 'text-slate-300' : 'text-slate-500'}`}>
+                            {roleObj.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">แผนก / สังกัด</label>
+                <Input
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  placeholder="เช่น ภาควิชาวิศวกรรมคอมพิวเตอร์"
+                  className="bg-slate-50 border-slate-200 text-sm"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setEditingUser(null)}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={isSubmitting}
+                  className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold px-6 shadow-sm"
+                >
+                  บันทึกการมอบสิทธิ์เพิ่ม
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Add New Staff/User Modal (Fullscreen z-[99999] Backdrop Overlay covering 100% of Viewport) */}
+      {mounted && isAddModalOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-sans animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus className="w-6 h-6 text-black" />
+                <span>เพิ่มบุคลากร / ครูใหม่</span>
+              </h3>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-base font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateNewUser} className="space-y-4 text-xs sm:text-sm">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
+                <Input
+                  required
+                  placeholder="เช่น ดร.สมศักดิ์ สายวิชา"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="bg-slate-50 border-slate-200 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">อีเมลสถาบันประจำสิทธิ์</label>
+                <Input
+                  type="email"
+                  required
+                  placeholder="teacher.new@x-karchang.ac.th"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="bg-slate-50 border-slate-200 font-mono text-xs sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-2">กำหนดบทบาทตั้งต้น (เลือกมอบได้หลายสิทธิ์):</label>
+                <div className="space-y-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+                  {ALL_AVAILABLE_ROLES.map((roleObj) => {
+                    const isChecked = newSelectedRoles.includes(roleObj.name);
+                    return (
+                      <div
+                        key={roleObj.name}
+                        onClick={() => handleToggleRoleInAdd(roleObj.name)}
+                        className={`p-2.5 rounded-xl border cursor-pointer text-xs flex items-center justify-between ${
+                          isChecked ? 'bg-black text-[#CEF34B] border-black font-extrabold' : 'bg-white border-slate-200 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <span>{roleObj.title}</span>
+                        {isChecked ? <CheckSquare className="w-4 h-4 text-[#CEF34B]" /> : <Square className="w-4 h-4 text-slate-400" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">รหัสผ่านสำหรับเข้าสู่ระบบ</label>
+                <Input
+                  type="text"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="bg-slate-50 border-slate-200 font-mono text-xs sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ภาควิชา / สังกัด</label>
+                <Input
+                  placeholder="เช่น สาขาช่างกลโรงงาน"
+                  value={newDepartment}
+                  onChange={(e) => setNewDepartment(e.target.value)}
+                  className="bg-slate-50 border-slate-200 text-sm"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={isSubmitting}
+                  className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold px-6 shadow-sm"
+                >
+                  บันทึกการสร้างบัญชี
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+

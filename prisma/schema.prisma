@@ -1,0 +1,287 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  SUSPENDED
+  DISABLED
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AccessType {
+  OPEN
+  APPROVAL_REQUIRED
+}
+
+enum EnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum MaterialType {
+  VIDEO
+  PDF
+  DOCUMENT
+  PRESENTATION
+  IMAGE
+  AUDIO
+  LINK
+  TEXT
+  EMBED
+}
+
+enum MaterialStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+enum AnnouncementLevel {
+  SYSTEM
+  COURSE
+}
+
+model User {
+  id          String     @id @default(uuid())
+  email       String     @unique
+  name        String
+  avatarUrl   String?
+  studentId   String?
+  department  String?
+  password    String?
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  userRoles           UserRole[]
+  createdCourses      Course[]             @relation("CourseCreator")
+  instructorCourses   CourseInstructor[]
+  enrollments         CourseEnrollment[]   @relation("StudentEnrollments")
+  approvedEnrollments CourseEnrollment[]   @relation("ApprovedByInstructor")
+  uploadedMaterials   LearningMaterial[]
+  announcements       Announcement[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  materialAccesses    MaterialAccessLog[]
+  attendances         Attendance[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @unique // STUDENT, PROFESSOR, COURSE_CREATOR_APPROVER, CONTENT_APPROVER, ADMIN, DIRECTOR
+  description String?
+
+  userRoles   UserRole[]
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model Course {
+  id              String       @id @default(uuid())
+  code            String       @unique
+  title           String
+  description     String
+  thumbnail       String?
+  category        String
+  semester        String
+  academicYear    String
+  status          CourseStatus @default(DRAFT)
+  accessType      AccessType   @default(APPROVAL_REQUIRED)
+  rejectionReason String?
+  storageLimitGb  Float        @default(10.0)
+  createdById     String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  createdBy    User                 @relation("CourseCreator", fields: [createdById], references: [id])
+  instructors  CourseInstructor[]
+  enrollments  CourseEnrollment[]
+  materials    LearningMaterial[]
+  announcements Announcement[]
+  attendances  Attendance[]
+
+  @@index([status])
+  @@index([category])
+  @@index([semester, academicYear])
+}
+
+model CourseInstructor {
+  id           String @id @default(uuid())
+  courseId     String
+  instructorId String
+
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor User   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, instructorId])
+}
+
+model CourseEnrollment {
+  id              String           @id @default(uuid())
+  courseId        String
+  studentId       String
+  status          EnrollmentStatus @default(PENDING)
+  requestedAt     DateTime         @default(now())
+  approvedAt      DateTime?
+  approvedById    String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    User   @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+  approvedBy User?  @relation("ApprovedByInstructor", fields: [approvedById], references: [id])
+
+  @@unique([courseId, studentId])
+  @@index([status])
+}
+
+model LearningMaterial {
+  id              String         @id @default(uuid())
+  courseId        String
+  title           String
+  description     String?
+  type            MaterialType
+  filePath        String
+  fileSize        BigInt         @default(0) // bytes
+  mimeType        String?
+  duration        Int?           // seconds for video/audio
+  order           Int            @default(0)
+  visibility      Boolean        @default(true)
+  status          MaterialStatus @default(PENDING_REVIEW)
+  rejectionReason String?
+  uploadedById    String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  course     Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploadedBy User                @relation(fields: [uploadedById], references: [id])
+  accessLogs MaterialAccessLog[]
+
+  @@index([courseId])
+  @@index([status])
+  @@index([type])
+}
+
+model MaterialAccessLog {
+  id             String   @id @default(uuid())
+  materialId     String
+  userId         String
+  viewedAt       DateTime @default(now())
+  durationWatched Int     @default(0)
+
+  material LearningMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([userId])
+}
+
+model Announcement {
+  id          String            @id @default(uuid())
+  title       String
+  content     String
+  level       AnnouncementLevel @default(SYSTEM)
+  courseId    String?
+  createdById String
+  publishedAt DateTime          @default(now())
+  expiresAt   DateTime?
+  status      String            @default("PUBLISHED") // DRAFT, PUBLISHED
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  createdBy User    @relation(fields: [createdById], references: [id])
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([level])
+  @@index([courseId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, DANGER
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  resource  String
+  ipAddress String?
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  courseId    String
+  studentId   String
+  date        String   // YYYY-MM-DD
+  status      String   // PRESENT, LATE, ABSENT, EXCUSED
+  checkInTime String?  // HH:mm:ss
+  sessionTopic String?
+  createdAt   DateTime @default(now())
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId, date])
+  @@index([courseId])
+  @@index([studentId])
+}
+

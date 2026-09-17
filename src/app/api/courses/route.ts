@@ -1,0 +1,109 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { enforceReadOnlyIfDirector, logAuditEvent } from '@/lib/rbac';
+import { AuthenticatedUser } from '@/lib/auth';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+    const category = searchParams.get('category') || '';
+    const semester = searchParams.get('semester') || '';
+    const status = searchParams.get('status') || '';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { code: { contains: search } },
+        { title: { contains: search } },
+        { description: { contains: search } },
+      ];
+    }
+    if (category) where.category = category;
+    if (semester) where.semester = semester;
+    if (status) where.status = status;
+
+    const [courses, total] = await Promise.all([
+      prisma.course.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: { select: { id: true, name: true, email: true } },
+          instructors: { include: { instructor: { select: { id: true, name: true, email: true } } } },
+          _count: { select: { enrollments: true, materials: true } },
+        },
+      }),
+      prisma.course.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      courses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('Get courses error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { user, code, title, description, category, semester, academicYear, accessType, storageLimitGb } = body;
+
+    // Director Read-Only Check
+    if (user && user.roles?.includes('DIRECTOR')) {
+      return NextResponse.json({
+        error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only) ไม่สามารถสร้างรายวิชาได้'
+      }, { status: 403 });
+    }
+
+    if (!code || !title || !description || !user?.id) {
+      return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' }, { status: 400 });
+    }
+
+    // Check code uniqueness
+    const existing = await prisma.course.findUnique({ where: { code } });
+    if (existing) {
+      return NextResponse.json({ error: 'รหัสวิชานี้มีอยู่ในระบบแล้ว' }, { status: 400 });
+    }
+
+    const course = await prisma.course.create({
+      data: {
+        code,
+        title,
+        description,
+        category: category || 'ทั่วไป',
+        semester: semester || '1',
+        academicYear: academicYear || '2026',
+        accessType: accessType || 'APPROVAL_REQUIRED',
+        storageLimitGb: parseFloat(storageLimitGb || '10.0'),
+        createdById: user.id,
+        status: 'DRAFT',
+        instructors: {
+          create: {
+            instructorId: user.id,
+          },
+        },
+      },
+    });
+
+    await logAuditEvent(user.id, 'CREATE_COURSE', `COURSE:${course.id}`, undefined, { code, title });
+
+    return NextResponse.json({ message: 'สร้างรายวิชาฉบับร่างสำเร็จ', course });
+  } catch (error: any) {
+    console.error('Create course error:', error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
+  }
+}
