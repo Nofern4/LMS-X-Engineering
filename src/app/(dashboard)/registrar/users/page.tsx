@@ -49,6 +49,8 @@ function RegistrarUsersContent() {
 
   const [mounted, setMounted] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  const [totalMatching, setTotalMatching] = useState<number>(0);
+  const [totalAllUsers, setTotalAllUsers] = useState<number>(0);
   const [roleStats, setRoleStats] = useState<Record<string, number>>({});
   const [search, setSearch] = useState(initialSearch);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('');
@@ -97,11 +99,14 @@ function RegistrarUsersContent() {
     const query = new URLSearchParams();
     if (search) query.set('search', search);
     if (selectedRoleFilter) query.set('role', selectedRoleFilter);
+    query.set('limit', '100');
 
     fetch(`/api/registrar/users?${query.toString()}`)
       .then((r) => r.json())
       .then((d) => {
         setUsers(d.users || []);
+        if (d.totalMatching !== undefined) setTotalMatching(d.totalMatching);
+        if (d.totalAllUsers !== undefined) setTotalAllUsers(d.totalAllUsers);
         if (d.roleStats) setRoleStats(d.roleStats);
       })
       .catch((err) => console.error(err))
@@ -125,8 +130,15 @@ function RegistrarUsersContent() {
   }, [search, selectedRoleFilter]);
 
   const handleApproveRequest = async (reqId: string) => {
+    // 1. Optimistically remove request immediately from view
+    const targetReq = roleRequests.find((r) => r.id === reqId);
+    setRoleRequests((prev) => prev.filter((r) => r.id !== reqId));
+    setRequestFeedback({
+      type: 'success',
+      text: `อนุมัติคำขอสิทธิ์ ${targetReq?.roleName === 'COURSE_CREATOR_APPROVER' ? 'คนอนุมัติ (APPROVER)' : targetReq?.roleName || ''} ของ ${targetReq?.user?.name || 'ผู้ใช้'} สำเร็จแล้ว ระบบกำลังบันทึกลงฐานข้อมูล`,
+    });
+
     setRequestActionLoading(reqId);
-    setRequestFeedback(null);
     try {
       const res = await fetch('/api/roles/request', {
         method: 'PATCH',
@@ -140,14 +152,19 @@ function RegistrarUsersContent() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // Rollback on failure
+        if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
         setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการอนุมัติ' });
       } else {
-        setRequestFeedback({ type: 'success', text: 'อนุมัติสิทธิ์ผู้ใช้งานสำเร็จแล้ว ระบบได้ปรับปรุงบทบาทเรียบร้อย' });
+        setRequestFeedback({
+          type: 'success',
+          text: `อนุมัติสิทธิ์ ${targetReq?.roleName === 'COURSE_CREATOR_APPROVER' ? 'คนอนุมัติ (APPROVER)' : targetReq?.roleName || ''} เรียบร้อยแล้ว ระบบปรับปรุงข้อมูลผู้ใช้ทันที`,
+        });
         fetchUsers();
-        fetchRoleRequests();
         window.dispatchEvent(new Event('role_updated'));
       }
     } catch (e) {
+      if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
       setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
     } finally {
       setRequestActionLoading(null);
@@ -155,8 +172,12 @@ function RegistrarUsersContent() {
   };
 
   const handleRejectRequest = async (reqId: string) => {
+    // 1. Optimistically remove request immediately from view
+    const targetReq = roleRequests.find((r) => r.id === reqId);
+    setRoleRequests((prev) => prev.filter((r) => r.id !== reqId));
+    setRequestFeedback({ type: 'success', text: 'ปฏิเสธคำขอสิทธิ์เรียบร้อยแล้ว' });
+
     setRequestActionLoading(reqId);
-    setRequestFeedback(null);
     try {
       const res = await fetch('/api/roles/request', {
         method: 'PATCH',
@@ -170,12 +191,13 @@ function RegistrarUsersContent() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
         setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการปฏิเสธ' });
       } else {
-        setRequestFeedback({ type: 'success', text: 'ปฏิเสธคำขอสิทธิ์เรียบร้อยแล้ว' });
         fetchRoleRequests();
       }
     } catch (e) {
+      if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
       setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
     } finally {
       setRequestActionLoading(null);
@@ -429,6 +451,17 @@ function RegistrarUsersContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {req.user && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleOpenEditModal(req.user)}
+                        className="text-xs font-bold bg-white text-slate-800 border-amber-300 hover:bg-amber-50"
+                        leftIcon={<Info className="w-3.5 h-3.5 text-amber-600" />}
+                      >
+                        ดูข้อมูลผู้ใช้
+                      </Button>
+                    )}
                     <Button
                       variant="primary"
                       size="sm"
@@ -466,7 +499,7 @@ function RegistrarUsersContent() {
               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
           }`}
         >
-          ทั้งหมด ({users.length})
+          ทั้งหมด ({totalAllUsers > 0 ? totalAllUsers.toLocaleString() : users.length})
         </button>
         <button
           onClick={() => setSelectedRoleFilter('STUDENT')}
@@ -476,7 +509,7 @@ function RegistrarUsersContent() {
               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
           }`}
         >
-          นักเรียน / นักศึกษา (STUDENT)
+          นักเรียน / นักศึกษา (STUDENT) ({roleStats['STUDENT'] !== undefined ? roleStats['STUDENT'].toLocaleString() : '-'})
         </button>
         <button
           onClick={() => setSelectedRoleFilter('PROFESSOR')}
@@ -486,17 +519,17 @@ function RegistrarUsersContent() {
               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
           }`}
         >
-          อาจารย์ / ครู (PROFESSOR)
+          อาจารย์ / ครู (PROFESSOR) ({roleStats['PROFESSOR'] !== undefined ? roleStats['PROFESSOR'].toLocaleString() : '-'})
         </button>
         <button
           onClick={() => setSelectedRoleFilter('COURSE_CREATOR_APPROVER')}
           className={`px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
-            selectedRoleFilter === 'COURSE_CREATOR_APPROVER'
+            selectedRoleFilter === 'COURSE_CREATOR_APPROVER' || selectedRoleFilter === 'APPROVER'
               ? 'bg-black text-[#CEF34B] shadow-sm'
               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
           }`}
         >
-          ผู้อนุมัติรายวิชา (APPROVER)
+          ผู้อนุมัติรายวิชา (APPROVER) ({(roleStats['COURSE_CREATOR_APPROVER'] || roleStats['APPROVER'] || 0).toLocaleString()})
         </button>
         <button
           onClick={() => setSelectedRoleFilter('REGISTRAR')}
@@ -506,7 +539,7 @@ function RegistrarUsersContent() {
               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
           }`}
         >
-          นายทะเบียน (REGISTRAR)
+          นายทะเบียน (REGISTRAR) ({roleStats['REGISTRAR'] !== undefined ? roleStats['REGISTRAR'].toLocaleString() : '-'})
         </button>
       </div>
 
@@ -522,7 +555,8 @@ function RegistrarUsersContent() {
             />
           </div>
           <p className="text-xs sm:text-sm text-slate-600 font-medium">
-            พบผู้ใช้งานในระบบจำนวน <span className="font-bold text-slate-900">{users.length}</span> รายการ
+            พบผู้ใช้งานในระบบจำนวน <span className="font-bold text-slate-900">{totalMatching > 0 ? totalMatching.toLocaleString() : users.length}</span> รายการ
+            {totalMatching > users.length && <span className="text-slate-400 font-normal"> (แสดง {users.length} รายการล่าสุด)</span>}
           </p>
         </CardHeader>
 
@@ -539,66 +573,90 @@ function RegistrarUsersContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((u) => {
-                const userRolesList = u.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) || ['STUDENT'];
-                return (
-                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 pl-6 font-bold text-slate-900 text-sm sm:text-base">{u.name}</td>
-                    <td className="p-4 font-mono text-slate-700 text-xs sm:text-sm">{u.email}</td>
-                    <td className="p-4 text-slate-600 text-xs sm:text-sm">{u.department || u.studentId || '-'}</td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {userRolesList.map((rName: string) => (
-                          <Badge
-                            key={rName}
-                            variant={getRoleBadgeVariant(rName)}
-                            size="sm"
-                            className="font-bold text-xs"
-                          >
-                            {rName}
-                          </Badge>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} size="sm" className="font-bold text-xs">
-                        {u.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4 pr-6 text-right space-x-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleOpenEditModal(u)}
-                        className="text-xs font-extrabold border-black bg-black text-[#CEF34B] hover:bg-slate-800"
-                        leftIcon={<ShieldCheck className="w-4 h-4 text-[#CEF34B]" />}
-                      >
-                        + เพิ่ม/จัดการสิทธิ์
-                      </Button>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-slate-500 text-xs">
+                    {isLoading ? 'กำลังโหลดข้อมูลผู้ใช้...' : 'ไม่พบข้อมูลผู้ใช้งานตามเงื่อนไขที่ค้นหา'}
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => {
+                  const userRolesList = u.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) || ['STUDENT'];
+                  return (
+                    <tr
+                      key={u.id}
+                      onClick={() => handleOpenEditModal(u)}
+                      className="hover:bg-amber-50/50 cursor-pointer transition-colors group"
+                      title="คลิกเพื่อดูข้อมูลและจัดการสิทธิ์"
+                    >
+                      <td className="p-4 pl-6 font-bold text-slate-900 text-sm sm:text-base group-hover:text-amber-800">
+                        {u.name}
+                      </td>
+                      <td className="p-4 font-mono text-slate-700 text-xs sm:text-sm">{u.email}</td>
+                      <td className="p-4 text-slate-600 text-xs sm:text-sm">{u.department || u.studentId || '-'}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {userRolesList.map((rName: string) => (
+                            <Badge
+                              key={rName}
+                              variant={getRoleBadgeVariant(rName)}
+                              size="sm"
+                              className="font-bold text-xs"
+                            >
+                              {rName}
+                            </Badge>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} size="sm" className="font-bold text-xs">
+                          {u.status}
+                        </Badge>
+                      </td>
+                      <td className="p-4 pr-6 text-right space-x-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditModal(u);
+                          }}
+                          className="text-xs font-extrabold border-black bg-black text-[#CEF34B] hover:bg-slate-800"
+                          leftIcon={<ShieldCheck className="w-4 h-4 text-[#CEF34B]" />}
+                        >
+                          คลิกดูข้อมูล / มอบสิทธิ์
+                        </Button>
 
-                      {u.status === 'ACTIVE' ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleToggleStatus(u.id, u.status)}
-                          className="text-xs font-bold"
-                        >
-                          ระงับสิทธิ์
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={() => handleToggleStatus(u.id, u.status)}
-                          className="text-xs font-extrabold bg-[#CEF34B] text-black"
-                        >
-                          เปิดใช้งาน
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        {u.status === 'ACTIVE' ? (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(u.id, u.status);
+                            }}
+                            className="text-xs font-bold"
+                          >
+                            ระงับสิทธิ์
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="success"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(u.id, u.status);
+                            }}
+                            className="text-xs font-extrabold bg-[#CEF34B] text-black"
+                          >
+                            เปิดใช้งาน
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -636,19 +694,47 @@ function RegistrarUsersContent() {
             )}
 
             <form onSubmit={handleSaveEditUser} className="space-y-5 text-xs sm:text-sm">
-              {/* User Read-Only Email & Current Role Badges */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">ผู้ใช้งานที่เลือก</p>
-                  <p className="font-bold text-slate-900 text-base">{editingUser.name}</p>
-                  <p className="font-mono text-slate-600 text-xs mt-0.5">{editingUser.email}</p>
-                </div>
-                <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
-                  {selectedRoles.map((r) => (
-                    <Badge key={r} variant={getRoleBadgeVariant(r)} size="sm">
-                      {r}
+              {/* User Full Profile Info & Current Role Badges */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ข้อมูลผู้ใช้งาน (User Profile)</p>
+                    <p className="font-extrabold text-slate-900 text-lg">{editingUser.name}</p>
+                    <p className="font-mono text-slate-600 text-xs mt-0.5">{editingUser.email}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1 items-center sm:justify-end">
+                    <Badge variant={editingUser.status === 'ACTIVE' ? 'success' : 'danger'} size="sm" className="font-bold">
+                      สถานะ: {editingUser.status || 'ACTIVE'}
                     </Badge>
-                  ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-600">
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">รหัสประจำตัว</span>
+                    <span className="font-semibold text-slate-800">{editingUser.studentId || editingUser.id?.slice(0, 8) || '-'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px]">แผนก / สังกัด</span>
+                    <span className="font-semibold text-slate-800">{editingUser.department || 'ไม่ระบุ'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 col-span-2 sm:col-span-1">
+                    <span className="text-slate-400 block text-[10px]">วันที่ลงทะเบียน</span>
+                    <span className="font-semibold text-slate-800">
+                      {editingUser.createdAt ? new Date(editingUser.createdAt).toLocaleDateString('th-TH') : '-'}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-bold mb-1">สิทธิ์ปัจจุบันที่ถือครอง:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedRoles.map((r) => (
+                      <Badge key={r} variant={getRoleBadgeVariant(r)} size="sm">
+                        {r}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -21,18 +21,26 @@ export async function GET(request: Request) {
     }
     if (status) where.status = status;
     if (roleFilter) {
+      const targetRoles = (roleFilter === 'APPROVER' || roleFilter === 'COURSE_CREATOR_APPROVER')
+        ? ['COURSE_CREATOR_APPROVER', 'APPROVER']
+        : [roleFilter];
       where.userRoles = {
         some: {
           role: {
-            name: roleFilter,
+            name: { in: targetRoles },
           },
         },
       };
     }
 
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const totalMatching = await prisma.user.count({ where });
+    const totalAllUsers = await prisma.user.count();
+
     const users = await prisma.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      take: limit > 0 ? limit : 100,
       include: {
         userRoles: {
           include: { role: true },
@@ -49,10 +57,15 @@ export async function GET(request: Request) {
       roleStats[r.name] = count;
     }
 
-    return NextResponse.json({ users, roleStats });
+    return NextResponse.json({ 
+      users, 
+      totalMatching, 
+      totalAllUsers, 
+      roleStats 
+    });
   } catch (error: any) {
     console.error('Registrar get users error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้' }, { status: 500 });
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้', users: [], totalMatching: 0, totalAllUsers: 0, roleStats: {} }, { status: 500 });
   }
 }
 

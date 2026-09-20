@@ -259,8 +259,23 @@ export async function PATCH(request: Request) {
     }
 
     if (action === 'APPROVE') {
-      // Find role in DB
-      const dbRole = await prisma.role.findUnique({ where: { name: roleReq.roleName } });
+      // Find role in DB with alias fallback (APPROVER -> COURSE_CREATOR_APPROVER)
+      let roleNameToFind = roleReq.roleName;
+      if (roleNameToFind === 'APPROVER') roleNameToFind = 'COURSE_CREATOR_APPROVER';
+
+      let dbRole = await prisma.role.findUnique({ where: { name: roleNameToFind } });
+      if (!dbRole) {
+        dbRole = await prisma.role.findFirst({
+          where: {
+            OR: [
+              { name: roleNameToFind },
+              { name: roleReq.roleName },
+              { name: 'COURSE_CREATOR_APPROVER' },
+            ],
+          },
+        });
+      }
+
       if (!dbRole) {
         return NextResponse.json({ error: `ไม่พบ Role ${roleReq.roleName} ในฐานข้อมูล` }, { status: 400 });
       }

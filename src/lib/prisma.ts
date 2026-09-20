@@ -54,10 +54,11 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Auto-configure SQLite for high concurrency
+// Auto-configure SQLite for high concurrency and serverless compatibility
 if (!globalForPrisma.sqliteOptimized) {
   globalForPrisma.sqliteOptimized = true;
-  prisma.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
+  const journalMode = process.env.VERCEL ? 'DELETE' : 'DELETE';
+  prisma.$queryRawUnsafe(`PRAGMA journal_mode = ${journalMode};`)
     .then(() => prisma.$queryRawUnsafe('PRAGMA synchronous = NORMAL;'))
     .then(() => prisma.$queryRawUnsafe('PRAGMA busy_timeout = 30000;'))
     .then(() => prisma.$queryRawUnsafe('PRAGMA cache_size = -64000;'))
