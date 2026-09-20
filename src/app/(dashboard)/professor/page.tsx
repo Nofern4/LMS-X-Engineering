@@ -634,56 +634,16 @@ function ProfessorDashboardContent() {
 
       {/* SECTION 1: รายชื่อนักศึกษาที่ลงเรียน */}
       <div id="enrollment" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-4">
-        <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-slate-900" />
-              <span>ภาพรวมนักศึกษาที่เข้าเรียนกับเรา {selectedCourseCode === 'ALL' ? '(4 รายวิชาหลัก)' : `- ${selectedCourseCode}`}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              CS101 (วิศวกรรมคอมพิวเตอร์) • SE302 (วิศวกรรมซอฟต์แวร์) • ME201 (ช่างกลโรงงาน) • EE305 (ช่างไฟฟ้ากำลัง)
-            </p>
-          </div>
-
-          {/* Select Course Switcher Pills - 4 Core Courses Only */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-200/70 p-1.5 rounded-2xl border border-slate-200">
-            <button
-              id="branch-btn-ALL"
-              key="ALL"
-              onClick={() => {
-                setSelectedCourseCode('ALL');
-                setShowAllStudents(false);
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                selectedCourseCode === 'ALL'
-                  ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                  : 'text-slate-700 hover:text-black bg-white/70'
-              }`}
-            >
-              ทั้งหมด (716 คน)
-            </button>
-            {professorCourses.map((c) => (
-              <button
-                id={`branch-btn-${c.code}`}
-                key={c.code}
-                onClick={() => {
-                  setSelectedCourseCode(c.code);
-                  setShowAllStudents(false);
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                  selectedCourseCode === c.code
-                    ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                    : 'text-slate-700 hover:text-black bg-white/70'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+        <div className="p-6 bg-slate-50 border-b border-slate-200">
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-slate-900" />
+            <span>ภาพรวมนักศึกษาที่เข้าเรียน</span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">แสดงรายชื่อผู้เรียนทั้งหมดในความดูแล</p>
         </div>
 
-        {/* Enrollment Summary Banner for Selected Course (Dynamic per Branch / All) */}
-        <div key={`metrics-card-${selectedCourseCode}`} className="px-6 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fadeIn">
+        {/* Enrollment Summary Banner */}
+        <div className="px-6 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fadeIn">
           <div className="p-5 rounded-2xl bg-white border border-slate-200 text-xs space-y-1.5 shadow-xs">
             <span className="text-slate-500 font-semibold">นักศึกษาที่ลงเรียนทั้งหมด</span>
             <p className="text-2xl sm:text-3xl font-black text-slate-900">
@@ -706,33 +666,23 @@ function ProfessorDashboardContent() {
                 <th className="p-4 pl-6 w-16">#</th>
                 <th className="p-4 w-44">รหัสประจำตัว</th>
                 <th className="p-4">ชื่อนักศึกษา</th>
-                <th className="p-4 w-60">สาขาวิชาที่ลงเรียน</th>
               </tr>
             </thead>
-            <tbody key={`table-body-${selectedCourseCode}`} className="divide-y divide-slate-100 animate-fadeIn">
+            <tbody className="divide-y divide-slate-100 animate-fadeIn">
               {currentStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500 font-medium">
-                    {isLoading ? 'กำลังโหลดข้อมูลนักศึกษา...' : `ไม่พบบันทึกการลงเรียนในรายวิชาที่เลือก (${selectedCourseCode})`}
+                  <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">
+                    {isLoading ? 'กำลังโหลดข้อมูลนักศึกษา...' : 'ไม่พบบันทึกข้อมูลนักศึกษา'}
                   </td>
                 </tr>
               ) : (
-                displayedStudents.map((log, idx) => {
-                  const cCode = log.courseCode || (log.studentId?.startsWith('XK-6501') ? 'CS101' : log.studentId?.startsWith('XK-6502') ? 'ME201' : log.studentId?.startsWith('XK-6503') ? 'EE305' : 'SE302');
-                  const cCat = log.category || (cCode === 'CS101' ? 'วิศวกรรมคอมพิวเตอร์' : cCode === 'ME201' ? 'ช่างกลโรงงาน' : cCode === 'EE305' ? 'ช่างไฟฟ้ากำลัง' : 'วิศวกรรมซอฟต์แวร์');
-                  return (
-                    <tr key={log.id || idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6 text-slate-400 font-mono text-xs">{idx + 1}</td>
-                      <td className="p-4 font-mono font-extrabold text-slate-900">{log.studentId}</td>
-                      <td className="p-4 font-bold text-slate-900">{log.name}</td>
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">
-                          {cCode} ({cCat})
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                displayedStudents.map((log, idx) => (
+                  <tr key={log.id || idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 text-slate-400 font-mono text-xs">{idx + 1}</td>
+                    <td className="p-4 font-mono font-extrabold text-slate-900">{log.studentId}</td>
+                    <td className="p-4 font-bold text-slate-900">{log.name}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
