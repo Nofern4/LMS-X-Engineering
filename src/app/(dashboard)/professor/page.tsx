@@ -29,12 +29,14 @@ import {
   ArrowLeft,
   CheckSquare,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
+import { VideoPlayer } from '@/components/ui/VideoPlayer';
 
 const DEFAULT_BRANCH_STUDENTS: Record<string, any[]> = {
   CS101: [
@@ -115,12 +117,159 @@ const DEFAULT_BRANCH_STUDENTS: Record<string, any[]> = {
   ],
 };
 
+const BRANCH_STATS: Record<string, { enrolled: number; completed: number; rate: string }> = {
+  ALL: { enrolled: 854, completed: 746, rate: '87.4%' },
+  CS101: { enrolled: 245, completed: 218, rate: '89.0%' },
+  ME201: { enrolled: 182, completed: 156, rate: '85.7%' },
+  EE305: { enrolled: 164, completed: 142, rate: '86.6%' },
+  AUTO101: { enrolled: 138, completed: 120, rate: '87.0%' },
+  SE302: { enrolled: 125, completed: 110, rate: '88.0%' },
+};
+
+interface ProfessorVideoClip {
+  id: string;
+  courseCode: string;
+  courseTitle: string;
+  category: string;
+  title: string;
+  description: string;
+  durationText: string;
+  fileSizeText: string;
+  uploadDate: string;
+  videoUrl?: string;
+  viewsCount: number;
+}
+
+const PROFESSOR_VIDEO_CLIPS: ProfessorVideoClip[] = [
+  {
+    id: 'vid-cs-1',
+    courseCode: 'CS101',
+    courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน (Computer Programming I)',
+    category: 'วิศวกรรมคอมพิวเตอร์',
+    title: 'บทที่ 1: พื้นฐานการเขียนโปรแกรมและโครงสร้างข้อมูลเบื้องต้น',
+    description: 'แนะนำภาษาโปรแกรมมิ่ง วิธีการติดตั้งเครื่องมือ Compiler, IDE และโครงสร้างโปรแกรมพื้นฐานสำหรับช่างเทคโนโลยี',
+    durationText: '60:00 นาที',
+    fileSizeText: '480 MB',
+    uploadDate: '1 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    viewsCount: 1420,
+  },
+  {
+    id: 'vid-cs-2',
+    courseCode: 'CS101',
+    courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน (Computer Programming I)',
+    category: 'วิศวกรรมคอมพิวเตอร์',
+    title: 'บทที่ 2: ตัวแปร ชนิดข้อมูล เงื่อนไข และลูปการทำงาน',
+    description: 'การประกาศตัวแปร ชนิดข้อมูลต่างๆ การใช้คำสั่ง if-else ตรวจสอบเงื่อนไข และการวนซ้ำด้วย for/while loop',
+    durationText: '70:00 นาที',
+    fileSizeText: '520 MB',
+    uploadDate: '3 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    viewsCount: 1280,
+  },
+  {
+    id: 'vid-cs-3',
+    courseCode: 'CS101',
+    courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน (Computer Programming I)',
+    category: 'วิศวกรรมคอมพิวเตอร์',
+    title: 'บทที่ 3: ฟังก์ชัน พอยน์เตอร์ และอาร์เรย์ขั้นสูง',
+    description: 'การสร้าง Modular Functions, การจัดการหน่วยความจำผ่าน Pointer และการประมวลผล Array หลายมิติ',
+    durationText: '85:00 นาที',
+    fileSizeText: '610 MB',
+    uploadDate: '7 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    viewsCount: 1150,
+  },
+  {
+    id: 'vid-ee-1',
+    courseCode: 'EE305',
+    courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT (Industrial Electrical Control & IoT)',
+    category: 'ช่างไฟฟ้ากำลัง',
+    title: 'บทที่ 1: วงจรควบคุมมอเตอร์ไฟฟ้าและ Magnetic Contactor',
+    description: 'การต่อวงจรควบคุมมอเตอร์ 3 เฟส ด้วย Magnetic Contactor, Overload Relay และระบบ Safety Interlock ในโรงงาน',
+    durationText: '75:00 นาที',
+    fileSizeText: '550 MB',
+    uploadDate: '4 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    viewsCount: 940,
+  },
+  {
+    id: 'vid-ee-2',
+    courseCode: 'EE305',
+    courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT (Industrial Electrical Control & IoT)',
+    category: 'ช่างไฟฟ้ากำลัง',
+    title: 'บทที่ 2: การเขียนโปรแกรม PLC ด้วย Ladder Diagram และการเชื่อมต่อ IoT',
+    description: 'หลักการทำงานของ PLC อุตสาหกรรม, การออกแบบ Ladder Diagram ควบคุม I/O, Timer/Counter และเชื่อมต่อ IoT Broker',
+    durationText: '90:00 นาที',
+    fileSizeText: '620 MB',
+    uploadDate: '9 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    viewsCount: 880,
+  },
+  {
+    id: 'vid-se-1',
+    courseCode: 'SE302',
+    courseTitle: 'วิศวกรรมซอฟต์แวร์ขั้นสูงและสถาปัตยกรรมระบบ (Advanced Software Engineering)',
+    category: 'วิศวกรรมซอฟต์แวร์',
+    title: 'บทที่ 1: สถาปัตยกรรม Clean Architecture และ Microservices',
+    description: 'การแบ่ง Layer ระบบแบบ Clean Architecture, Domain-Driven Design และการสื่อสารระหว่าง Microservices',
+    durationText: '75:00 นาที',
+    fileSizeText: '580 MB',
+    uploadDate: '5 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    viewsCount: 820,
+  },
+  {
+    id: 'vid-se-2',
+    courseCode: 'SE302',
+    courseTitle: 'วิศวกรรมซอฟต์แวร์ขั้นสูงและสถาปัตยกรรมระบบ (Advanced Software Engineering)',
+    category: 'วิศวกรรมซอฟต์แวร์',
+    title: 'บทที่ 2: Design Patterns สำหรับระบบขนาดใหญ่และการทำ Automated Testing',
+    description: 'Factory, Repository, Unit of Work, Observer และการเซ็ตอัป Unit/Integration Tests ร่วมกับ CI/CD Pipeline',
+    durationText: '60:00 นาที',
+    fileSizeText: '490 MB',
+    uploadDate: '10 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+    viewsCount: 760,
+  },
+  {
+    id: 'vid-auto-1',
+    courseCode: 'AUTO101',
+    courseTitle: 'เทคโนโลยีช่างยนต์และระบบส่งกำลัง (Automotive Technology)',
+    category: 'เทคโนโลยีช่างยนต์',
+    title: 'บทที่ 1: พื้นฐานระบบเครื่องยนต์สันดาปภายในและการวินิจฉัยปัญหา',
+    description: 'หลักการทำงาน 4 จังหวะของเครื่องยนต์เบนซินและดีเซล, ระบบวาล์ว, ระบบหล่อลื่น และการใช้เครื่องสแกน OBD-II',
+    durationText: '50:00 นาที',
+    fileSizeText: '460 MB',
+    uploadDate: '2 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    viewsCount: 710,
+  },
+  {
+    id: 'vid-auto-2',
+    courseCode: 'AUTO101',
+    courseTitle: 'เทคโนโลยีช่างยนต์และระบบส่งกำลัง (Automotive Technology)',
+    category: 'เทคโนโลยีช่างยนต์',
+    title: 'บทที่ 2: ระบบยานยนต์ไฟฟ้า EV และแบตเตอรี่แรงดันสูง (High-Voltage Battery)',
+    description: 'ระบบขับเคลื่อนมอเตอร์ไฟฟ้า (Inverter & Traction Motor), เซลล์แบตเตอรี่ และมาตรฐานความปลอดภัยในงานช่างยานยนต์ EV',
+    durationText: '60:00 นาที',
+    fileSizeText: '530 MB',
+    uploadDate: '8 ก.ย. 2026',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4',
+    viewsCount: 890,
+  },
+];
+
 function ProfessorDashboardContent() {
   const [courses, setCourses] = useState<any[]>([]);
   const [courseStudents, setCourseStudents] = useState<Record<string, any[]>>(DEFAULT_BRANCH_STUDENTS);
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>('ALL');
   const [showAllStudents, setShowAllStudents] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Video clips filter & active preview modal state
+  const [selectedVideoCourseFilter, setSelectedVideoCourseFilter] = useState<string>('ALL');
+  const [activeVideoModal, setActiveVideoModal] = useState<ProfessorVideoClip | null>(null);
 
   // Professor Taught Courses Selector List
   const [professorCourses, setProfessorCourses] = useState([
@@ -292,35 +441,33 @@ function ProfessorDashboardContent() {
   };
 
   const allStudents = React.useMemo(() => {
-    const seen = new Set<string>();
+    // Interleave students from each branch so "ทั้งหมด" displays a rich mix across branches
+    const courseCodes = Object.keys(courseStudents);
+    const maxLen = Math.max(...courseCodes.map((code) => (courseStudents[code] || []).length), 0);
     const list: any[] = [];
-    Object.values(courseStudents).forEach((sList) => {
-      sList.forEach((s) => {
-        const key = s.studentId || s.id || s.name;
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          list.push(s);
+    const seen = new Set<string>();
+
+    for (let i = 0; i < maxLen; i++) {
+      for (const code of courseCodes) {
+        const s = courseStudents[code]?.[i];
+        if (s) {
+          const key = s.studentId || s.id || s.name;
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            list.push(s);
+          }
         }
-      });
-    });
+      }
+    }
     return list;
   }, [courseStudents]);
-
-  const branchStats: Record<string, { enrolled: number; completed: number; rate: string }> = {
-    ALL: { enrolled: 854, completed: 746, rate: '87.4%' },
-    CS101: { enrolled: 245, completed: 218, rate: '89.0%' },
-    ME201: { enrolled: 182, completed: 156, rate: '85.7%' },
-    EE305: { enrolled: 164, completed: 142, rate: '86.6%' },
-    AUTO101: { enrolled: 138, completed: 120, rate: '87.0%' },
-    SE302: { enrolled: 125, completed: 110, rate: '88.0%' },
-  };
 
   const currentCourse = courses.find((c) => c.code === selectedCourseCode);
   const currentStudents = selectedCourseCode === 'ALL'
     ? allStudents
     : (courseStudents[selectedCourseCode] || []);
   
-  const currentStats = branchStats[selectedCourseCode] || {
+  const currentStats = BRANCH_STATS[selectedCourseCode] || {
     enrolled: currentStudents.length || 0,
     completed: Math.round((currentStudents.length || 0) * 0.88),
     rate: '88.0%',
@@ -342,6 +489,14 @@ function ProfessorDashboardContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 z-10">
+          <a
+            href="#classes-offered"
+            className="rounded-full font-extrabold text-xs py-3 px-5 bg-white/10 hover:bg-white/20 text-[#CEF34B] border border-white/10 hover:border-[#CEF34B]/50 transition-all flex items-center gap-2 cursor-pointer shadow-md transform hover:scale-105"
+          >
+            <Video className="w-4 h-4 text-[#CEF34B]" />
+            <span>คลาสที่เปิดสอน ({PROFESSOR_VIDEO_CLIPS.length} คลิป)</span>
+          </a>
+
           <Button
             variant="primary"
             size="md"
@@ -409,6 +564,141 @@ function ProfessorDashboardContent() {
         </div>
       </div>
 
+      {/* SECTION: คลาสที่เปิดสอน (คลิปวิดีโอที่อาจารย์เคยลง) */}
+      <div id="classes-offered" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-4">
+        <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-[#CEF34B] flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                <span>คลาสที่เปิดสอน</span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#CEF34B] text-black border border-[#bce038]">
+                  {selectedVideoCourseFilter === 'ALL'
+                    ? `${PROFESSOR_VIDEO_CLIPS.length} คลิปวิดีโอ`
+                    : `${PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === selectedVideoCourseFilter).length} คลิปวิดีโอ`}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                สื่อวิดีโอบทเรียนที่ ผศ.ดร.วิชาญ สอนดี ได้บันทึกและเผยแพร่ในแต่ละรายวิชา
+              </p>
+            </div>
+          </div>
+
+          {/* Video Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => setSelectedVideoCourseFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                selectedVideoCourseFilter === 'ALL'
+                  ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
+                  : 'text-slate-700 hover:text-black bg-white/60'
+              }`}
+            >
+              ทั้งหมด ({PROFESSOR_VIDEO_CLIPS.length})
+            </button>
+            {['CS101', 'EE305', 'SE302', 'AUTO101'].map((code) => {
+              const count = PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === code).length;
+              return (
+                <button
+                  key={code}
+                  onClick={() => setSelectedVideoCourseFilter(code)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    selectedVideoCourseFilter === code
+                      ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
+                      : 'text-slate-700 hover:text-black bg-white/60'
+                  }`}
+                >
+                  {code} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Video Cards Grid */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {(selectedVideoCourseFilter === 'ALL'
+            ? PROFESSOR_VIDEO_CLIPS
+            : PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === selectedVideoCourseFilter)
+          ).map((clip) => (
+            <div
+              key={clip.id}
+              className="group bg-white rounded-2xl border border-slate-200 hover:border-slate-900 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden"
+            >
+              <div>
+                {/* Video Thumbnail Preview Header */}
+                <div
+                  onClick={() => setActiveVideoModal(clip)}
+                  className="h-44 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-4 relative flex flex-col justify-between text-white cursor-pointer group-hover:brightness-105 transition-all overflow-hidden"
+                >
+                  {/* Subtle Grid Accent */}
+                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] pointer-events-none" />
+
+                  {/* Top Badges */}
+                  <div className="flex items-center justify-between z-10">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-black/60 text-[#CEF34B] border border-[#CEF34B]/30 backdrop-blur-md">
+                      {clip.courseCode} • {clip.category}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20 backdrop-blur-md flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-[#CEF34B]" />
+                      {clip.durationText}
+                    </span>
+                  </div>
+
+                  {/* Center Play Button Overlay */}
+                  <div className="flex items-center justify-center my-auto z-10">
+                    <div className="w-12 h-12 rounded-full bg-[#CEF34B] text-black flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-300">
+                      <Play className="w-5 h-5 ml-0.5 fill-black text-black" />
+                    </div>
+                  </div>
+
+                  {/* Bottom Meta */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-300 z-10">
+                    <span className="flex items-center gap-1 font-semibold text-emerald-400">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      อนุมัติเผยแพร่แล้ว
+                    </span>
+                    <span className="text-slate-400">{clip.fileSizeText}</span>
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 space-y-2">
+                  <h3 className="text-sm font-extrabold text-slate-900 line-clamp-2 leading-snug">
+                    {clip.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                    {clip.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Card Footer Actions */}
+              <div className="px-5 pb-5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveVideoModal(clip)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-black text-[#CEF34B] font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Play className="w-3.5 h-3.5 fill-[#CEF34B]" />
+                  <span>เปิดดูคลิปวิดีโอ</span>
+                </button>
+                <Link
+                  href={`/learning/${clip.courseCode.toLowerCase()}`}
+                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                  title="ไปที่ห้องเรียน"
+                >
+                  <span>ห้องเรียน</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* SECTION 1: รายชื่อนักศึกษาที่ลงเรียน */}
       <div id="enrollment" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-4">
         <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -462,7 +752,7 @@ function ProfessorDashboardContent() {
         </div>
 
         {/* Enrollment Summary Banner for Selected Course (Dynamic per Branch / All) */}
-        <div className="px-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div key={`metrics-card-${selectedCourseCode}`} className="px-6 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fadeIn">
           <div className="p-5 rounded-2xl bg-white border border-slate-200 text-xs space-y-1.5 shadow-xs">
             <span className="text-slate-500 font-semibold">นักศึกษาที่ลงเรียนทั้งหมด</span>
             <p className="text-2xl sm:text-3xl font-black text-slate-900">
@@ -487,7 +777,7 @@ function ProfessorDashboardContent() {
                 <th className="p-4">ชื่อนักศึกษา</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody key={`table-body-${selectedCourseCode}`} className="divide-y divide-slate-100 animate-fadeIn">
               {currentStudents.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">
@@ -885,6 +1175,50 @@ function ProfessorDashboardContent() {
           )}
         </form>
       </Modal>
+
+      {/* Video Player Modal for Published Clips */}
+      {activeVideoModal && (
+        <Modal
+          isOpen={!!activeVideoModal}
+          onClose={() => setActiveVideoModal(null)}
+          title={`คลาสที่เปิดสอน: ${activeVideoModal.courseCode} - ${activeVideoModal.title}`}
+          maxWidth="2xl"
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-xl">
+              <VideoPlayer
+                src={activeVideoModal.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}
+                title={activeVideoModal.title}
+              />
+            </div>
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-slate-900 text-[#CEF34B]">
+                    {activeVideoModal.courseCode}
+                  </span>
+                  <span className="text-xs font-bold text-slate-700">{activeVideoModal.category}</span>
+                </div>
+                <span className="text-xs font-semibold text-slate-500">
+                  ความยาว: {activeVideoModal.durationText} • ขนาดไฟล์: {activeVideoModal.fileSizeText}
+                </span>
+              </div>
+              <h4 className="text-base font-extrabold text-slate-900">{activeVideoModal.title}</h4>
+              <p className="text-xs text-slate-600 leading-relaxed">{activeVideoModal.description}</p>
+              <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/80">
+                <span>อาจารย์ผู้สอน: ผศ.ดร.วิชาญ สอนดี</span>
+                <Link
+                  href={`/learning/${activeVideoModal.courseCode.toLowerCase()}`}
+                  className="inline-flex items-center gap-1 font-bold text-slate-900 hover:underline"
+                >
+                  <span>เข้าสู่ห้องเรียนเต็มรูปแบบ</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

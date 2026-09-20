@@ -78,18 +78,13 @@ export const RoleRequestModal: React.FC<RoleRequestModalProps> = ({
 
   useEffect(() => {
     setRolesList(currentRoles);
+    if (currentRoles.length <= 1) {
+      setActiveTab('request');
+    }
   }, [currentRoles]);
 
-  // Check if original role is Student
-  const isOriginalStudent = userEmail.toLowerCase().includes('student') || 
-    (rolesList.includes('STUDENT') && !rolesList.some(r => ['REGISTRAR', 'DIRECTOR'].includes(r)));
-
-  // Filter allowed roles based on rules:
-  // - Original student: can ONLY request อาจารย์ (PROFESSOR) or คนอนุมัติ (COURSE_CREATOR_APPROVER)
-  // - Other roles: can request any role
-  const candidateRoles = isOriginalStudent
-    ? ALL_AVAILABLE_ROLES.filter(r => r.name === 'PROFESSOR' || r.name === 'COURSE_CREATOR_APPROVER')
-    : ALL_AVAILABLE_ROLES;
+  // ทุก role สามารถขอสิทธิ์ role อื่นได้ทั้งหมดตามที่ผู้ใช้ต้องการ
+  const candidateRoles = ALL_AVAILABLE_ROLES;
 
   const eligibleRolesToRequest = candidateRoles.filter(
     (r) => !rolesList.includes(r.name) && !(r.name === 'COURSE_CREATOR_APPROVER' && rolesList.includes('APPROVER'))
@@ -217,33 +212,35 @@ export const RoleRequestModal: React.FC<RoleRequestModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Navigation Pill Bar - No stickers, No History */}
-        <div className="bg-slate-50 px-6 pt-3.5 pb-2.5 border-b border-slate-200 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => { setActiveTab('request'); setStatusMessage(null); }}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'request'
-                ? 'bg-slate-900 text-[#CEF34B] shadow-md font-extrabold'
-                : 'bg-white text-slate-600 hover:text-black border border-slate-200'
-            }`}
-          >
-            <span>ขอรับสิทธิ์</span>
-          </button>
+        {/* Tab Navigation Pill Bar - Only show Tab 2 if user has MORE than 1 role */}
+        {rolesList.length > 1 && (
+          <div className="bg-slate-50 px-6 pt-3.5 pb-2.5 border-b border-slate-200 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('request'); setStatusMessage(null); }}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'request'
+                  ? 'bg-slate-900 text-[#CEF34B] shadow-md font-extrabold'
+                  : 'bg-white text-slate-600 hover:text-black border border-slate-200'
+              }`}
+            >
+              <span>ขอรับสิทธิ์</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('relinquish'); setStatusMessage(null); }}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'relinquish'
-                ? 'bg-slate-900 text-[#CEF34B] shadow-md font-extrabold'
-                : 'bg-white text-slate-600 hover:text-black border border-slate-200'
-            }`}
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-            <span>ยกเลิกสิทธิ์ที่เป็นอยู่ ({rolesList.length})</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('relinquish'); setStatusMessage(null); }}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'relinquish'
+                  ? 'bg-slate-900 text-[#CEF34B] shadow-md font-extrabold'
+                  : 'bg-white text-slate-600 hover:text-black border border-slate-200'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>ยกเลิกสิทธิ์ที่เป็นอยู่ ({rolesList.length - 1})</span>
+            </button>
+          </div>
+        )}
 
         {/* Status Notification Banner */}
         {statusMessage && (
@@ -370,7 +367,8 @@ export const RoleRequestModal: React.FC<RoleRequestModalProps> = ({
                     const isProfessor = roleName === 'PROFESSOR';
                     const isDirector = roleName === 'DIRECTOR';
                     const isRegistrar = roleName === 'REGISTRAR';
-                    const isLastRole = rolesList.length <= 1;
+                    const initialPrimaryRole = currentRoles[0] || rolesList[0];
+                    const isOriginalRole = roleName === initialPrimaryRole || rolesList.length <= 1;
 
                     return (
                       <div
@@ -395,20 +393,22 @@ export const RoleRequestModal: React.FC<RoleRequestModalProps> = ({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleInstantRevoke(roleName)}
-                          disabled={isSubmitting || isLastRole}
-                          title={isLastRole ? 'ต้องมีบทบาทอย่างน้อย 1 บทบาทในระบบ' : 'ยกเลิกสิทธิ์นี้ทันที'}
-                          className={`px-4 py-2 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            isLastRole
-                              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                              : 'bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600'
-                          }`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>ยกเลิกสิทธิ์</span>
-                        </button>
+                        {isOriginalRole ? (
+                          <span className="px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                            สิทธิ์หลักเดิม (ไม่สามารถยกเลิกได้)
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleInstantRevoke(roleName)}
+                            disabled={isSubmitting}
+                            title="ยกเลิกสิทธิ์นี้ทันที"
+                            className="px-4 py-2 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>ยกเลิกสิทธิ์</span>
+                          </button>
+                        )}
                       </div>
                     );
                   })}
