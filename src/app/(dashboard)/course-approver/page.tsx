@@ -116,6 +116,7 @@ export default function CourseApproverDashboard() {
         setEnrollments((prev) => prev.filter((e) => e.id !== selectedItem.id));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('enrollment_updated'));
+          localStorage.setItem('last_enrollment_update', Date.now().toString());
         }
       }
       setIsModalOpen(false);

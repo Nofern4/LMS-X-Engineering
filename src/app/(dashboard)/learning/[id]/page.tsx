@@ -251,56 +251,59 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
   // For seed courses use seed questions, but NEVER force CS101 on custom courses without quizzes
   const currentQuizQuestions: QuizQuestion[] = COURSE_QUIZZES[courseCode] || [];
 
-  useEffect(() => {
-    fetch(`/api/courses/${id}`)
+  const fetchCourseData = () => {
+    fetch(`/api/courses/${id}?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    })
       .then((r) => r.json())
       .then((data) => {
         const c = data.course;
+        if (!c) return;
         setCourse(c);
 
         if (c?.materials?.length > 0) {
-          setActiveMaterial(c.materials[0]);
-          setCompletedMaterials({ [c.materials[0].id]: true });
-        } else {
-          setActiveMaterial(null);
+          setActiveMaterial((prev: any) => prev || c.materials[0]);
+          setCompletedMaterials((prev) => ({ ...prev, [c.materials[0].id]: true }));
         }
 
-        // ตรวจสอบสิทธิ์เข้าเรียนจาก accessType จริงของวิชา
-        // ห้องเปิด (OPEN) → เข้าได้เลย
-        // ห้องปิด (APPROVAL_REQUIRED) → ตรวจจาก enrollments ว่ามีสถานะ APPROVED หรือไม่
-        if (c?.accessType === 'OPEN' || c?.accessType === 'PUBLIC') {
-          setIsApproved(true);
-        } else {
-          // ดึง user จาก session/localStorage (รองรับทั้ง user_session และ demo_user_email)
-          const userEmail = typeof window !== 'undefined'
-            ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
-            : 'student@student.x-karchang.ac.th';
-          const userSessionStr = typeof window !== 'undefined' 
-            ? (localStorage.getItem('user_session') || localStorage.getItem('user')) 
-            : null;
-          const currentUser = userSessionStr ? (() => { try { return JSON.parse(userSessionStr); } catch { return null; } })() : null;
+        const userSessionStr = typeof window !== 'undefined' 
+          ? (localStorage.getItem('user_session') || localStorage.getItem('user')) 
+          : null;
+        const currentUser = userSessionStr ? (() => { try { return JSON.parse(userSessionStr); } catch { return null; } })() : null;
 
-          // ตรวจ enrollments ของวิชานี้
+        const demoEmail = typeof window !== 'undefined' ? localStorage.getItem('demo_user_email') : null;
+        const userEmail = currentUser?.email || demoEmail || 'student@student.x-karchang.ac.th';
+
+        // Check if staff, instructor, approver, admin
+        const isStaffOrApprover = Boolean(
+          currentUser?.roles?.some((r: string) =>
+            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR'].includes(r)
+          ) ||
+          userEmail === 'course.approver@x-karchang.ac.th' ||
+          userEmail === 'professor@x-karchang.ac.th' ||
+          userEmail === 'admin@x-karchang.ac.th' ||
+          userEmail === 'director@x-karchang.ac.th'
+        );
+
+        if (isStaffOrApprover || c?.accessType === 'OPEN' || c?.accessType === 'PUBLIC') {
+          setIsApproved(true);
+          setEnrollmentStatus('APPROVED');
+        } else {
+          // Check student enrollments
           const enrollments: any[] = c?.enrollments || [];
           const myEnrollment = enrollments.find((e: any) =>
             (e.student?.email && e.student.email.toLowerCase() === userEmail.toLowerCase()) ||
-            (currentUser?.id && (e.studentId === currentUser.id || e.student?.id === currentUser.id))
+            (currentUser?.id && (e.studentId === currentUser.id || e.student?.id === currentUser.id)) ||
+            (userEmail.toLowerCase().includes('student') && e.student?.email?.toLowerCase().includes('student'))
           );
 
           if (myEnrollment) {
             setEnrollmentStatus(myEnrollment.status);
             setIsApproved(myEnrollment.status === 'APPROVED');
           } else {
-            // ถ้าเป็น PROFESSOR/ADMIN/อาจารย์เจ้าของวิชา → เข้าได้
-            const isProfOrAdmin = currentUser?.roles?.some((r: string) =>
-              ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR'].includes(r)
-            );
-            if (isProfOrAdmin) {
-              setIsApproved(true);
-            } else {
-              setIsApproved(false);
-              setEnrollmentStatus('NONE');
-            }
+            setIsApproved(false);
+            setEnrollmentStatus('NONE');
           }
         }
 
@@ -316,7 +319,26 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
           }
         }
       })
+      .catch(console.error)
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCourseData();
+
+    const handleUpdate = () => {
+      fetchCourseData();
+    };
+
+    window.addEventListener('enrollment_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('enrollment_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, [id]);
 
 

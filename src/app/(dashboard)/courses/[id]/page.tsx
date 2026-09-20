@@ -17,36 +17,92 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const [isLoading, setIsLoading] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/courses/${id}`)
+  const fetchCourse = () => {
+    fetch(`/api/courses/${id}?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    })
       .then((r) => r.json())
       .then((data) => {
+        if (!data.course) return;
         setCourse(data.course);
-        const userEmail = typeof window !== 'undefined'
-          ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
-          : 'student@student.x-karchang.ac.th';
+
+        const sessionUser = typeof window !== 'undefined'
+          ? (() => {
+              try {
+                const s = localStorage.getItem('user_session') || localStorage.getItem('user');
+                return s ? JSON.parse(s) : null;
+              } catch { return null; }
+            })()
+          : null;
+
+        const demoEmail = typeof window !== 'undefined' ? localStorage.getItem('demo_user_email') : null;
+        const userEmail = sessionUser?.email || demoEmail || 'student@student.x-karchang.ac.th';
+
+        // Check if user is staff/instructor/approver/admin
+        const isStaffOrApprover = Boolean(
+          sessionUser?.roles?.some((r: string) =>
+            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR'].includes(r)
+          ) ||
+          demoEmail === 'course.approver@x-karchang.ac.th' ||
+          demoEmail === 'professor@x-karchang.ac.th' ||
+          demoEmail === 'admin@x-karchang.ac.th' ||
+          demoEmail === 'director@x-karchang.ac.th'
+        );
+
+        if (isStaffOrApprover || data.course?.accessType === 'OPEN') {
+          setEnrollmentStatus('APPROVED');
+          return;
+        }
 
         const myEnroll = data.course?.enrollments?.find((e: any) => 
-          e.student?.email && e.student.email.toLowerCase() === userEmail.toLowerCase()
+          (e.student?.email && e.student.email.toLowerCase() === userEmail.toLowerCase()) ||
+          (sessionUser?.id && (e.studentId === sessionUser.id || e.student?.id === sessionUser.id)) ||
+          (userEmail.toLowerCase().includes('student') && e.student?.email?.toLowerCase().includes('student'))
         );
+
         if (myEnroll) {
           setEnrollmentStatus(myEnroll.status);
-        } else if (data.course?.accessType === 'OPEN') {
-          setEnrollmentStatus('APPROVED');
         } else {
           setEnrollmentStatus(null);
         }
       })
+      .catch(console.error)
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCourse();
+
+    const handleUpdate = () => {
+      fetchCourse();
+    };
+
+    window.addEventListener('enrollment_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('enrollment_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, [id]);
 
   const handleRequestEnroll = async () => {
     setIsRequesting(true);
-    setEnrollmentStatus('PENDING'); // ปรับสถานะเป็นรออนุมัติทันที
+    setEnrollmentStatus('PENDING');
     try {
-      const userEmail = typeof window !== 'undefined'
-        ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
-        : 'student@student.x-karchang.ac.th';
+      const sessionUser = typeof window !== 'undefined'
+        ? (() => {
+            try {
+              const s = localStorage.getItem('user_session') || localStorage.getItem('user');
+              return s ? JSON.parse(s) : null;
+            } catch { return null; }
+          })()
+        : null;
+      const demoEmail = typeof window !== 'undefined' ? localStorage.getItem('demo_user_email') : null;
+      const userEmail = sessionUser?.email || demoEmail || 'student@student.x-karchang.ac.th';
 
       const res = await fetch(`/api/courses/${course?.id || id}/enroll`, {
         method: 'POST',
@@ -57,7 +113,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok && data.enrollment) {
         setEnrollmentStatus(data.enrollment.status || 'PENDING');
       }
-      window.dispatchEvent(new Event('enrollment_updated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('enrollment_updated'));
+        localStorage.setItem('last_enrollment_update', Date.now().toString());
+      }
     } catch (e) {
       console.error(e);
     } finally {
