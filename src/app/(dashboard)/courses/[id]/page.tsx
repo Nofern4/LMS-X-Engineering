@@ -160,13 +160,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         <div>
           {enrollmentStatus === 'APPROVED' ? (
             <Link href={`/learning/${course.id}`}>
-              <Button variant="primary" size="lg" className="font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 shadow-xs flex items-center gap-2 text-xs" leftIcon={<PlayCircle className="w-4 h-4 text-amber-400" />}>
-                เข้าสู่ห้องเรียน (Enter Class)
+              <Button variant="primary" size="lg" className="font-extrabold rounded-full bg-[#CEF34B] hover:bg-[#bce038] text-black shadow-xs flex items-center gap-2 text-xs" leftIcon={<PlayCircle className="w-4 h-4 text-black" />}>
+                เข้าสู่ห้องเรียน
               </Button>
             </Link>
           ) : enrollmentStatus === 'PENDING' ? (
-            <Button variant="outline" size="lg" disabled className="rounded-xl border-slate-200 bg-slate-100 text-amber-700 text-xs font-semibold" leftIcon={<Clock className="w-4 h-4 text-amber-600" />}>
-              ⏳ รอ "คนอนุมัติ" กดอนุมัติสิทธิ์...
+            <Button variant="outline" size="lg" disabled className="rounded-full border-slate-200 bg-slate-100 text-slate-600 text-xs font-semibold" leftIcon={<Clock className="w-4 h-4 text-slate-500" />}>
+              รออนุมัติสิทธิ์จากอาจารย์
             </Button>
           ) : (
             <Button
@@ -174,10 +174,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               size="lg"
               isLoading={isRequesting}
               onClick={handleRequestEnroll}
-              leftIcon={<Send className="w-4 h-4 text-amber-400" />}
-              className="font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 shadow-xs text-xs"
+              leftIcon={<Send className="w-4 h-4 text-black" />}
+              className="font-extrabold rounded-full bg-[#CEF34B] hover:bg-[#bce038] text-black shadow-xs text-xs"
             >
-              ขออนุมัติเข้าเรียนคลาสแบบปิด
+              ขอเข้าร่วมเรียน
             </Button>
           )}
         </div>

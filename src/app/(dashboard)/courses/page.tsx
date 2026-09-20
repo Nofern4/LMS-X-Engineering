@@ -122,10 +122,6 @@ export default function GlobalCoursesCatalogPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               คลังรายวิชาทั้งหมด
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-4 h-4 text-lime-600 flex-shrink-0" />
-              <span>ทุกรายวิชาเปิดกว้างให้นักศึกษาทุกสาขาวิชาเรียนได้ โดยไม่มีข้อจำกัดแยกสาขา</span>
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -169,21 +165,6 @@ export default function GlobalCoursesCatalogPage() {
                 leftIcon={<Search className="w-4 h-4 text-slate-400" />}
                 className="rounded-xl bg-slate-50 border-slate-200 text-xs py-2.5 px-4 text-slate-900 focus:bg-white focus:border-slate-900"
               />
-            </div>
-
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                ภาคการเรียน:
-              </label>
-              <select
-                value={semester}
-                onChange={(e) => setSemester(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-slate-900"
-              >
-                <option value="">ทุกภาคการเรียน</option>
-                <option value="1">ภาคการเรียนที่ 1</option>
-                <option value="2">ภาคการเรียนที่ 2</option>
-              </select>
             </div>
           </div>
 
@@ -349,7 +330,7 @@ export default function GlobalCoursesCatalogPage() {
                     return (
                       <Button disabled variant="secondary" size="md"
                         className="w-full font-bold rounded-full py-3 text-xs shadow-none bg-amber-50 text-amber-700 border border-amber-300 cursor-not-allowed">
-                        ⏳ รออนุมัติจากอาจารย์
+                         รออนุมัติจากอาจารย์
                       </Button>
                     );
                   }
@@ -360,8 +341,8 @@ export default function GlobalCoursesCatalogPage() {
                       <Button variant="primary" size="md"
                         disabled={isEnrolling}
                         onClick={() => handleEnroll(c.id)}
-                        className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-rose-600 hover:bg-rose-700 text-white border-0 flex items-center justify-center transition-all">
-                        {isEnrolling ? 'กำลังส่ง...' : '↩ ขอเข้าร่วมใหม่อีกครั้ง'}
+                        className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all">
+                        {isEnrolling ? 'กำลังส่ง...' : 'ขอเข้าร่วมใหม่อีกครั้ง'}
                       </Button>
                     );
                   }
@@ -371,8 +352,8 @@ export default function GlobalCoursesCatalogPage() {
                     <Button variant="primary" size="md"
                       disabled={isEnrolling}
                       onClick={() => handleEnroll(c.id)}
-                      className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-slate-900 hover:bg-slate-700 text-[#CEF34B] border-0 flex items-center justify-center transition-all">
-                      {isEnrolling ? 'กำลังส่ง...' : '✋ ขอเข้าร่วมเรียน'}
+                      className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all">
+                      {isEnrolling ? 'กำลังส่ง...' : 'ขอเข้าร่วมเรียน'}
                     </Button>
                   );
                 })()}
