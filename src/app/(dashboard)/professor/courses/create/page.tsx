@@ -31,7 +31,7 @@ export default function CreateCoursePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user: { id: 'prof-1', roles: ['PROFESSOR'] },
-          code,
+          code: code.trim() || `XK-${Math.floor(1000 + Math.random() * 9000)}`,
           title,
           description,
           category,
@@ -92,15 +92,7 @@ export default function CreateCoursePage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Input
-              label="รหัสวิชา (Course Code)"
-              required
-              placeholder="ตัวอย่าง: CS102"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-
+          <div>
             <Input
               label="ชื่อรายวิชา (Course Name)"
               required

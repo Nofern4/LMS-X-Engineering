@@ -884,30 +884,17 @@ function ProfessorDashboardContent() {
         <form onSubmit={handleCreateCourseSubmit} className="space-y-4 text-xs font-sans">
           {createStep === 1 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-1">
-                    รหัสวิชา (Course Code)
-                  </label>
-                  <Input
-                    placeholder="ตัวอย่าง: TECH101 (เว้นว่างเพื่อสุ่มอัตโนมัติ)"
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                    className="rounded-xl text-xs bg-slate-50 border-slate-200 uppercase font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-1">
-                    ชื่อรายวิชา (Course Title) <span className="text-rose-500">*</span>
-                  </label>
-                  <Input
-                    placeholder="ตัวอย่าง: ปัญญาประดิษฐ์ในงานช่าง"
-                    required
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="rounded-xl text-xs bg-slate-50 border-slate-200"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-900 mb-1">
+                  ชื่อรายวิชา (Course Title) <span className="text-rose-500">*</span>
+                </label>
+                <Input
+                  placeholder="ตัวอย่าง: ปัญญาประดิษฐ์ในงานช่างอุตสาหกรรม"
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="rounded-xl text-xs bg-slate-50 border-slate-200"
+                />
               </div>
 
 
