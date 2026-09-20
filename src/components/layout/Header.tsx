@@ -35,8 +35,20 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
   const [userRoles, setUserRoles] = useState<string[]>([role]);
   const [displayName, setDisplayName] = useState<string>(userName);
   const [currentLang, setCurrentLang] = useState<string>(DEFAULT_LANGUAGE);
-
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [headerSearchType, setHeaderSearchType] = useState<'course' | 'instructor' | 'code'>('course');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleHeaderSearch = (val: string, type: 'course' | 'instructor' | 'code') => {
+    setHeaderSearch(val);
+    window.dispatchEvent(new CustomEvent('header_search', { detail: { search: val, searchType: type } }));
+  };
+
+  const executeHeaderSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    router.push(`/courses?search=${encodeURIComponent(headerSearch)}&searchType=${headerSearchType}`);
+    window.dispatchEvent(new CustomEvent('header_search', { detail: { search: headerSearch, searchType: headerSearchType } }));
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -254,15 +266,44 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
             })}
           </nav>
 
-          {/* Integrated Search Input Capsule */}
-          <div className="relative w-32 xl:w-48 flex-shrink min-w-[100px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder={translate('ค้นหารายวิชา...', currentLang)}
-              className="w-full pl-8 pr-3 py-1 text-xs rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 transition-all text-slate-900 font-medium truncate"
-            />
-          </div>
+          {/* Clean Integrated Search Bar with Dropdown (Human-Crafted, No Stickers/Emojis) */}
+          <form onSubmit={executeHeaderSearch} className="flex items-center bg-slate-100/90 hover:bg-white rounded-full border border-slate-200 focus-within:border-slate-900 focus-within:bg-white transition-all overflow-hidden flex-shrink min-w-[250px] xl:min-w-[310px]">
+            <select
+              value={headerSearchType}
+              onChange={(e) => {
+                const newType = e.target.value as 'course' | 'instructor' | 'code';
+                setHeaderSearchType(newType);
+                handleHeaderSearch(headerSearch, newType);
+              }}
+              className="bg-transparent text-[11px] font-bold text-slate-700 pl-3 pr-1.5 py-1.5 focus:outline-none cursor-pointer border-r border-slate-200 select-none"
+            >
+              <option value="course">ค้นหารายวิชา</option>
+              <option value="instructor">ค้นหาชื่ออาจารย์</option>
+              <option value="code">ค้นหารหัสวิชา</option>
+            </select>
+            <div className="relative flex-1 flex items-center">
+              <input
+                type="text"
+                value={headerSearch}
+                onChange={(e) => handleHeaderSearch(e.target.value, headerSearchType)}
+                placeholder={
+                  headerSearchType === 'instructor'
+                    ? 'ค้นหาชื่ออาจารย์...'
+                    : headerSearchType === 'code'
+                    ? 'ค้นหารหัสวิชา (ตัวเลข เช่น 101, 302)...'
+                    : 'ค้นหารายวิชา...'
+                }
+                className="w-full pl-2.5 pr-8 py-1.5 text-xs bg-transparent focus:outline-none text-slate-900 font-medium placeholder:text-slate-400"
+              />
+              <button
+                type="submit"
+                title="ค้นหา"
+                className="absolute right-2 p-1 text-slate-400 hover:text-slate-900 transition-colors"
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* 3. Action Buttons & Right Pill Capsule */}
@@ -275,10 +316,10 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
           <button
             onClick={() => setIsRoleRequestOpen(true)}
             className="bg-white/95 backdrop-blur-md hover:bg-slate-900 hover:text-[#CEF34B] text-slate-800 px-3 sm:px-3.5 py-1.5 rounded-full shadow-lg border border-slate-200/90 flex items-center gap-1.5 text-xs font-bold transition-all group cursor-pointer active:scale-95 flex-shrink-0 whitespace-nowrap"
-            title={translate('จัดการสิทธิ์บทบาท', currentLang)}
+            title="ขอสิทธิ์"
           >
             <ShieldCheck className="w-4 h-4 text-amber-500 group-hover:text-[#CEF34B] transition-colors flex-shrink-0" />
-            <span className="hidden sm:inline">{translate('จัดการสิทธิ์บทบาท', currentLang)}</span>
+            <span className="hidden sm:inline">ขอสิทธิ์</span>
           </button>
 
           {/* Right Pill Capsule: User Profile & Dropdown Switcher */}
@@ -482,10 +523,10 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
                       setIsDropdownOpen(false);
                       setIsRoleRequestOpen(true);
                     }}
-                    className="w-full p-2.5 rounded-xl text-left text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    className="w-full p-2.5 rounded-xl text-left text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-bold"
                   >
                     <ShieldCheck className="w-4 h-4 text-amber-500" />
-                    <span>{translate('ศูนย์จัดการสิทธิ์และบทบาท', currentLang)}</span>
+                    <span>ขอสิทธิ์</span>
                   </button>
 
                   <button

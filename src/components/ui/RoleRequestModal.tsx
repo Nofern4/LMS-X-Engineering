@@ -203,7 +203,7 @@ export const RoleRequestModal: React.FC<RoleRequestModalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                ศูนย์จัดการสิทธิ์และบทบาท
+                ขอสิทธิ์
               </h2>
               <p className="text-xs text-slate-400">
                 ผู้ใช้งาน: <span className="text-white font-bold">{cleanUserName}</span> ({userEmail})

@@ -1507,11 +1507,17 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     ja: '教員権限の管理・委嘱手続き',
     fr: 'Gestion des Droits et Nominations des Enseignants',
   },
+  'ขอสิทธิ์': {
+    en: 'Request Roles',
+    zh: '申请角色权限',
+    ja: '権限リクエスト',
+    fr: 'Demander des Droits',
+  },
   'จัดการสิทธิ์บทบาท': {
-    en: 'Manage Roles',
-    zh: '管理角色权限',
-    ja: '役割権限管理',
-    fr: 'Gérer les Rôles',
+    en: 'Request Roles',
+    zh: '申请角色权限',
+    ja: '権限リクエスト',
+    fr: 'Demander des Droits',
   },
   'จัดการสิทธิ์ผู้ใช้ทั้งหมด': {
     en: 'Manage All User Permissions',

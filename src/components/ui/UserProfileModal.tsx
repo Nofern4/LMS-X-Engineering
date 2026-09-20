@@ -286,7 +286,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="text-[11px] font-bold text-[#CEF34B] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>ศูนย์จัดการสิทธิ์และบทบาท</span>
+                  <span>ขอสิทธิ์</span>
                 </button>
               )}
             </div>
