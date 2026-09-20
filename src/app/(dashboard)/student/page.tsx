@@ -110,7 +110,11 @@ export default function StudentDashboard() {
   useEffect(() => {
     loadData();
     window.addEventListener('role_updated', loadData);
-    return () => window.removeEventListener('role_updated', loadData);
+    window.addEventListener('enrollment_updated', loadData);
+    return () => {
+      window.removeEventListener('role_updated', loadData);
+      window.removeEventListener('enrollment_updated', loadData);
+    };
   }, []);
 
   // Filter courses without forcing department boundaries - all students can study/enroll
@@ -416,21 +420,21 @@ export default function StudentDashboard() {
                         ) : (
                           <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 font-extrabold text-xs inline-flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-amber-600" />
-                            รอ "คนอนุมัติ" กดอนุมัติสิทธิ์
+                            รออาจารย์ผู้สอนอนุมัติ
                           </span>
                         )}
                       </td>
                       <td className="p-4 pr-6 text-right">
                         {isApproved ? (
                           <Link href={`/learning/${course?.id}`}>
-                            <button className="bg-black hover:bg-slate-800 text-[#CEF34B] font-bold rounded-full text-xs sm:text-sm px-5 py-2 shadow-xs inline-flex items-center justify-center">
+                            <button className="bg-black hover:bg-slate-800 text-[#CEF34B] font-bold rounded-full text-xs sm:text-sm px-5 py-2 shadow-xs inline-flex items-center justify-center cursor-pointer">
                               <span>เข้าสู่ห้องเรียน</span>
                             </button>
                           </Link>
                         ) : (
                           <Link href={`/courses/${course?.id}`}>
-                            <button className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold rounded-full text-xs sm:text-sm px-5 py-2 shadow-xs inline-flex items-center justify-center">
-                              <span>รออนุมัติ</span>
+                            <button className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold rounded-full text-xs sm:text-sm px-5 py-2 shadow-xs inline-flex items-center justify-center cursor-pointer">
+                              <span>รออนุมัติ (ดูรายละเอียด)</span>
                             </button>
                           </Link>
                         )}

@@ -60,6 +60,14 @@ export async function GET(request: Request) {
         include: {
           createdBy: { select: { id: true, name: true, email: true } },
           instructors: { include: { instructor: { select: { id: true, name: true, email: true } } } },
+          enrollments: {
+            select: {
+              id: true,
+              studentId: true,
+              status: true,
+              student: { select: { id: true, email: true, name: true } },
+            },
+          },
           _count: { select: { enrollments: true, materials: true } },
         },
       }),

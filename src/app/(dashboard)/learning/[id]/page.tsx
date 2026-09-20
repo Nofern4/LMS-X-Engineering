@@ -283,16 +283,21 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
         if (c?.accessType === 'OPEN' || c?.accessType === 'PUBLIC') {
           setIsApproved(true);
         } else {
-          // ตรวจสอบว่า user ปัจจุบันมี enrollment ที่ APPROVED หรือไม่
-          // ดึง user จาก session/localStorage
-          const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-          const currentUser = userStr ? (() => { try { return JSON.parse(userStr); } catch { return null; } })() : null;
+          // ดึง user จาก session/localStorage (รองรับทั้ง user_session และ demo_user_email)
+          const userEmail = typeof window !== 'undefined'
+            ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
+            : 'student@student.x-karchang.ac.th';
+          const userSessionStr = typeof window !== 'undefined' 
+            ? (localStorage.getItem('user_session') || localStorage.getItem('user')) 
+            : null;
+          const currentUser = userSessionStr ? (() => { try { return JSON.parse(userSessionStr); } catch { return null; } })() : null;
 
           // ตรวจ enrollments ของวิชานี้
           const enrollments: any[] = c?.enrollments || [];
-          const myEnrollment = currentUser
-            ? enrollments.find((e: any) => e.studentId === currentUser.id || e.student?.id === currentUser.id)
-            : null;
+          const myEnrollment = enrollments.find((e: any) =>
+            (e.student?.email && e.student.email.toLowerCase() === userEmail.toLowerCase()) ||
+            (currentUser?.id && (e.studentId === currentUser.id || e.student?.id === currentUser.id))
+          );
 
           if (myEnrollment) {
             setEnrollmentStatus(myEnrollment.status);
@@ -306,7 +311,7 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
               setIsApproved(true);
             } else {
               setIsApproved(false);
-              setEnrollmentStatus('PENDING');
+              setEnrollmentStatus('NONE');
             }
           }
         }
@@ -373,6 +378,33 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
     return `${(num / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const [isEnrollingDirect, setIsEnrollingDirect] = useState(false);
+  const handleEnrollFromLearningPage = async () => {
+    setIsEnrollingDirect(true);
+    setEnrollmentStatus('PENDING');
+    try {
+      const userEmail = typeof window !== 'undefined'
+        ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
+        : 'student@student.x-karchang.ac.th';
+
+      const userSessionStr = typeof window !== 'undefined'
+        ? (localStorage.getItem('user_session') || localStorage.getItem('user'))
+        : null;
+      const currentUser = userSessionStr ? JSON.parse(userSessionStr) : { email: userEmail, roles: ['STUDENT'] };
+
+      await fetch(`/api/courses/${course?.id || id}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: currentUser }),
+      });
+      window.dispatchEvent(new Event('enrollment_updated'));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsEnrollingDirect(false);
+    }
+  };
+
   // ยังโหลดข้อมูลอยู่ → แสดง loading แทน ไม่ให้ flash หน้า locked
   if (isLoading || isApproved === null) {
     return (
@@ -417,24 +449,43 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                 {isRejected ? 'คำขอเข้าเรียนถูกปฏิเสธ' : 'คลาสแบบปิด — รออนุมัติสิทธิ์'}
               </span>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight pt-2">
-                {isRejected ? 'ไม่ผ่านการอนุมัติ' : 'รออนุมัติ'}
+                {isRejected ? 'ไม่ผ่านการอนุมัติ' : isPending ? 'รออนุมัติ' : 'วิชาคลาสแบบปิด'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-semibold">
                 {isRejected
                   ? 'คำขอเข้าเรียนของคุณถูกอาจารย์ผู้สอนปฏิเสธ กรุณาติดต่ออาจารย์เพื่อขอข้อมูลเพิ่มเติม'
                   : isPending
                   ? (<>วิชานี้เป็นคลาสแบบปิด คำขอของคุณอยู่ระหว่างรอ <strong className="text-amber-300">อาจารย์ผู้สอน</strong> พิจารณาอนุมัติ<br />คุณจะเข้าดูบทเรียนได้ทันทีเมื่อได้รับการอนุมัติ</>)
-                  : (<>วิชานี้เป็นคลาสแบบปิด กรุณากลับไปสมัครเข้าเรียนที่หน้าคลังรายวิชาก่อน</>)
+                  : (<>วิชานี้เป็นคลาสแบบปิดเฉพาะ คุณสามารถกดยื่นคำขอเข้าเรียนเพื่อให้อาจารย์ผู้สอนพิจารณาอนุมัติได้ทันที</>)
                 }
               </p>
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              {!isPending && !isRejected && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={isEnrollingDirect}
+                  onClick={handleEnrollFromLearningPage}
+                  className="w-full sm:w-auto rounded-full font-extrabold text-xs py-3.5 px-8 bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 shadow-lg cursor-pointer"
+                >
+                  {isEnrollingDirect ? 'กำลังส่งคำขอ...' : 'ยื่นขออนุมัติเข้าเรียน'}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => router.push(`/courses/${course?.id || id}`)}
+                className="w-full sm:w-auto rounded-full font-bold text-xs py-3.5 px-6 border-slate-700 text-white hover:bg-slate-800"
+              >
+                ดูรายละเอียดรายวิชา
+              </Button>
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => router.push('/courses')}
-                className="w-full sm:w-auto rounded-full font-extrabold text-xs py-3.5 px-8 bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 shadow-lg"
+                className="w-full sm:w-auto rounded-full font-extrabold text-xs py-3.5 px-6 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-md"
               >
                 กลับสู่คลังรายวิชา
               </Button>

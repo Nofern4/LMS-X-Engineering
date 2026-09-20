@@ -26,7 +26,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
           : 'student@student.x-karchang.ac.th';
 
-        const myEnroll = data.course?.enrollments?.find((e: any) => e.student?.email === userEmail);
+        const myEnroll = data.course?.enrollments?.find((e: any) => 
+          e.student?.email && e.student.email.toLowerCase() === userEmail.toLowerCase()
+        );
         if (myEnroll) {
           setEnrollmentStatus(myEnroll.status);
         } else if (data.course?.accessType === 'OPEN') {
@@ -40,6 +42,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   const handleRequestEnroll = async () => {
     setIsRequesting(true);
+    setEnrollmentStatus('PENDING'); // ปรับสถานะเป็นรออนุมัติทันที
     try {
       const userEmail = typeof window !== 'undefined'
         ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
@@ -51,9 +54,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({ user: { email: userEmail, roles: ['STUDENT'] } }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setEnrollmentStatus(data.enrollment?.status || 'PENDING');
+      if (res.ok && data.enrollment) {
+        setEnrollmentStatus(data.enrollment.status || 'PENDING');
       }
+      window.dispatchEvent(new Event('enrollment_updated'));
     } catch (e) {
       console.error(e);
     } finally {
@@ -150,9 +154,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             {enrollmentStatus === 'APPROVED'
               ? 'คุณได้รับการอนุมัติสิทธิ์เข้าร่วมรายวิชานี้เรียบร้อยแล้ว สามารถเข้าสู่ห้องเรียนได้ทันที'
               : enrollmentStatus === 'PENDING'
-              ? 'คำขอของคุณถูกส่งไปยัง "Role คนอนุมัติ" เรียบร้อยแล้ว อยู่ระหว่างรอการกดอนุมัติสิทธิ์เข้าคลาสแบบปิด'
+              ? 'คำขอของคุณถูกส่งไปยังอาจารย์ผู้สอนเรียบร้อยแล้ว อยู่ระหว่างรอการกดอนุมัติสิทธิ์เข้าคลาสแบบปิด'
               : course.accessType === 'APPROVAL_REQUIRED'
-              ? 'วิชานี้เป็นคลาสแบบปิดเฉพาะ ต้องส่งคำขอสิทธิ์ถึง "คนอนุมัติ (Course Approver)" เพื่ออนุมัติก่อนเข้าเรียน'
+              ? 'วิชานี้เป็นคลาสแบบปิดเฉพาะ ต้องส่งคำขอสิทธิ์ถึงอาจารย์ผู้สอนเพื่ออนุมัติก่อนเข้าเรียน'
               : 'วิชานี้เป็นวิชาเปิดทั่วไป คนใน มหาวิทยาลัย Xการช่าง สามารถเข้าเรียนได้ทันที'}
           </p>
         </div>

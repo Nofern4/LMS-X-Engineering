@@ -32,33 +32,51 @@ export default function GlobalCoursesCatalogPage() {
   const [enrollmentStatuses, setEnrollmentStatuses] = useState<Record<string, string>>({});
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
 
-  // ดึง user จาก localStorage
+  // ดึง user จาก localStorage (รองรับทั้ง user_session และ demo_user_email)
   const getCurrentUser = () => {
     if (typeof window === 'undefined') return null;
-    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
+    try {
+      const sess = localStorage.getItem('user_session');
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (parsed?.email) return parsed;
+      }
+      const email = localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th';
+      return {
+        id: 'student-1',
+        email,
+        name: 'สมชาย ช่างกล',
+        roles: ['STUDENT'],
+      };
+    } catch {
+      return {
+        id: 'student-1',
+        email: 'student@student.x-karchang.ac.th',
+        name: 'สมชาย ช่างกล',
+        roles: ['STUDENT'],
+      };
+    }
   };
 
   useEffect(() => {
     fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}`)
       .then((r) => r.json())
-      .then(async (d) => {
+      .then((d) => {
         const list: any[] = d.courses || [];
         setCourses(list);
 
-        // สำหรับวิชาที่ต้องอนุมัติ ดึง enrollment status ของ user ปัจจุบัน
         const user = getCurrentUser();
+        const userEmail = (user?.email || '').toLowerCase();
         const statuses: Record<string, string> = {};
+
         for (const c of list) {
-          if (c.accessType === 'APPROVAL_REQUIRED') {
-            try {
-              const r2 = await fetch(`/api/courses/${c.id}`);
-              const d2 = await r2.json();
-              const enrollments: any[] = d2.course?.enrollments || [];
-              const myEnroll = user
-                ? enrollments.find((e: any) => e.studentId === user.id || e.student?.id === user.id)
-                : null;
-              statuses[c.id] = myEnroll ? myEnroll.status : 'NONE';
-            } catch { statuses[c.id] = 'NONE'; }
+          if (c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED') {
+            const enrollments: any[] = c.enrollments || [];
+            const myEnroll = enrollments.find((e: any) =>
+              (e.student?.email && e.student.email.toLowerCase() === userEmail) ||
+              (user?.id && (e.studentId === user.id || e.student?.id === user.id))
+            );
+            statuses[c.id] = myEnroll ? myEnroll.status : 'NONE';
           } else {
             statuses[c.id] = 'APPROVED';
           }
@@ -70,8 +88,9 @@ export default function GlobalCoursesCatalogPage() {
 
   const handleEnroll = async (courseId: string) => {
     const user = getCurrentUser();
-    if (!user) return;
     setEnrollingId(courseId);
+    // ปรับสถานะทันที (Optimistic Update) ให้ผู้ใช้เห็นว่า "รออนุมัติ" ทันทีโดยไม่ต้องรอนาน
+    setEnrollmentStatuses((prev) => ({ ...prev, [courseId]: 'PENDING' }));
     try {
       const res = await fetch(`/api/courses/${courseId}/enroll`, {
         method: 'POST',
@@ -82,6 +101,9 @@ export default function GlobalCoursesCatalogPage() {
       if (data.enrollment) {
         setEnrollmentStatuses((prev) => ({ ...prev, [courseId]: data.enrollment.status }));
       }
+      window.dispatchEvent(new Event('enrollment_updated'));
+    } catch (e) {
+      console.error(e);
     } finally {
       setEnrollingId(null);
     }
@@ -240,48 +262,52 @@ export default function GlobalCoursesCatalogPage() {
                 key={c.id}
                 className="flex flex-col h-full overflow-hidden bg-white border border-slate-200/90 rounded-3xl hover:border-slate-300 shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group"
               >
-                {/* Cover Photo Header */}
-                <div className="h-44 bg-slate-900 p-4 flex flex-col justify-between relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
-                    style={{ backgroundImage: `url('${coverImg}')` }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20" />
+                {/* Cover Photo Header - Clickable to View Details */}
+                <Link href={`/courses/${c.id}`} className="block">
+                  <div className="h-44 bg-slate-900 p-4 flex flex-col justify-between relative overflow-hidden cursor-pointer">
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
+                      style={{ backgroundImage: `url('${coverImg}')` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20" />
 
-                  {/* Top Bar: Code Badge + Pure Icon Symbol for Open/Closed */}
-                  <div className="flex items-center justify-between z-10">
-                    <span className="px-3.5 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs shadow-md">
-                      {c.code}
-                    </span>
-
-                    {isClosed ? (
-                      <span
-                        title="คลาสปิด"
-                        className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-md"
-                      >
-                        <Lock className="w-4 h-4 text-amber-400" />
+                    {/* Top Bar: Code Badge + Pure Icon Symbol for Open/Closed */}
+                    <div className="flex items-center justify-between z-10">
+                      <span className="px-3.5 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs shadow-md">
+                        {c.code}
                       </span>
-                    ) : (
-                      <span
-                        title="วิชาเปิดทั่วไป (เข้าเรียนได้ทันที)"
-                        className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-md"
-                      >
-                        <Unlock className="w-4 h-4 text-emerald-400" />
-                      </span>
-                    )}
-                  </div>
 
-                  <div className="z-10">
-                    <p className="text-xs font-bold text-slate-200 uppercase tracking-wider">{c.category}</p>
+                      {isClosed ? (
+                        <span
+                          title="คลาสปิด"
+                          className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-md"
+                        >
+                          <Lock className="w-4 h-4 text-amber-400" />
+                        </span>
+                      ) : (
+                        <span
+                          title="วิชาเปิดทั่วไป (เข้าเรียนได้ทันที)"
+                          className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-md"
+                        >
+                          <Unlock className="w-4 h-4 text-emerald-400" />
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="z-10">
+                      <p className="text-xs font-bold text-slate-200 uppercase tracking-wider">{c.category}</p>
+                    </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Card Body */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
-                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug group-hover:text-black transition-colors">
-                      {cleanTitle(c.title)}
-                    </h3>
+                    <Link href={`/courses/${c.id}`} className="block group/title">
+                      <h3 className="text-base sm:text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug group-hover/title:underline transition-colors cursor-pointer">
+                        {cleanTitle(c.title)}
+                      </h3>
+                    </Link>
                     <p className="text-xs text-slate-600 font-medium">
                       อาจารย์ผู้สอน: <span className="font-bold text-slate-900">{instructorName}</span>
                     </p>
@@ -314,20 +340,23 @@ export default function GlobalCoursesCatalogPage() {
                     return (
                       <Link href={`/learning/${c.id}`} className="block w-full">
                         <Button variant="primary" size="md"
-                          className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black flex items-center justify-center transition-all">
+                          className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black flex items-center justify-center transition-all cursor-pointer">
                           เข้าสู่ห้องเรียน
                         </Button>
                       </Link>
                     );
                   }
 
-                  // รออนุมัติอยู่
+                  // รออนุมัติอยู่ → แสดงสถานะรออนุมัติชัดเจน พร้อมให้กดเข้าไปดูรายละเอียดได้
                   if (enrollStatus === 'PENDING') {
                     return (
-                      <Button disabled variant="secondary" size="md"
-                        className="w-full font-bold rounded-full py-3 text-xs shadow-none bg-amber-50 text-amber-700 border border-amber-300 cursor-not-allowed">
-                         รออนุมัติจากอาจารย์
-                      </Button>
+                      <Link href={`/courses/${c.id}`} className="block w-full">
+                        <Button variant="secondary" size="md"
+                          className="w-full font-bold rounded-full py-3 text-xs bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>รออนุมัติ (ดูรายละเอียด)</span>
+                        </Button>
+                      </Link>
                     );
                   }
 
@@ -337,7 +366,7 @@ export default function GlobalCoursesCatalogPage() {
                       <Button variant="primary" size="md"
                         disabled={isEnrolling}
                         onClick={() => handleEnroll(c.id)}
-                        className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all">
+                        className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all cursor-pointer">
                         {isEnrolling ? 'กำลังส่ง...' : 'ขอเข้าร่วมใหม่อีกครั้ง'}
                       </Button>
                     );
@@ -348,8 +377,8 @@ export default function GlobalCoursesCatalogPage() {
                     <Button variant="primary" size="md"
                       disabled={isEnrolling}
                       onClick={() => handleEnroll(c.id)}
-                      className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all">
-                      {isEnrolling ? 'กำลังส่ง...' : 'ขอเข้าร่วมเรียน'}
+                      className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black border-0 flex items-center justify-center transition-all cursor-pointer">
+                      {isEnrolling ? 'กำลังส่ง...' : 'ขอเข้าเรียน'}
                     </Button>
                   );
                 })()}

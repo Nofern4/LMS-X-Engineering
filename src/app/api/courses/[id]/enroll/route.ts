@@ -8,12 +8,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const body = await request.json();
     const { user } = body;
 
-    if (user && user.roles?.includes('DIRECTOR')) {
-      return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
+    // Resolve real student in DB first
+    const userEmail = user?.email || (typeof user === 'string' ? user : '');
+    const userId = user?.id || '';
+
+    const studentUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(userId ? [{ id: userId }] : []),
+          ...(userEmail ? [{ email: userEmail }] : [{ email: 'student@student.x-karchang.ac.th' }])
+        ]
+      },
+      include: {
+        userRoles: { include: { role: true } }
+      }
+    });
+
+    if (!studentUser) {
+      return NextResponse.json({ error: 'ไม่พบข้อมูลผู้ใช้งานในระบบ' }, { status: 404 });
     }
 
-    if (!user || !user.roles?.includes('STUDENT')) {
-      return NextResponse.json({ error: 'เฉพาะนักศึกษาเท่านั้นที่สามารถขอเข้าร่วมรายวิชาได้' }, { status: 403 });
+    const roles = user?.roles || studentUser.userRoles.map((ur: any) => ur.role.name);
+    if (roles.includes('DIRECTOR')) {
+      return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
     }
 
     let course = await prisma.course.findUnique({ where: { id } });
@@ -30,12 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'ไม่พบรายวิชาที่ระบุ' }, { status: 404 });
     }
 
-    // Resolve real student ID in DB
-    let realStudentId = user.id;
-    const studentUser = await prisma.user.findFirst({
-      where: { OR: [{ id: user.id }, { email: user.email || '' }] }
-    });
-    if (studentUser) realStudentId = studentUser.id;
+    const realStudentId = studentUser.id;
 
     // ตรวจสอบ enrollment ที่มีอยู่แล้ว
     const existing = await prisma.courseEnrollment.findUnique({
