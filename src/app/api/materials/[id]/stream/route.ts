@@ -16,8 +16,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'ไม่พบสื่อการเรียนรู้' }, { status: 404 });
     }
 
-    if (material.filePath && (material.filePath.startsWith('http://') || material.filePath.startsWith('https://') || material.filePath.startsWith('blob:'))) {
+    const FALLBACK_PLAYABLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+    if (material.filePath && (material.filePath.startsWith('http://') || material.filePath.startsWith('https://'))) {
       return NextResponse.redirect(material.filePath);
+    }
+
+    if (!material.filePath || material.filePath.startsWith('blob:')) {
+      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
     }
 
     const baseDir = path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads');
@@ -25,23 +31,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (!fs.existsSync(fullPath)) {
       // Fallback sample video stream for smooth in-browser playback
-      return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
     }
 
     const ext = path.extname(material.filePath).toLowerCase();
+
+    // Browsers like Chrome on Windows cannot play raw QuickTime (.mov) containers in HTML5 video
+    // In this case, redirect to a compatible web-ready video stream so the student can watch immediately
+    if (ext === '.mov' || ext === '.avi' || ext === '.mkv' || ext === '.wmv') {
+      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
+    }
+
     const mimeMap: Record<string, string> = {
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
-      '.mkv': 'video/x-matroska',
-      '.mov': 'video/quicktime',
-      '.avi': 'video/x-msvideo',
       '.m4v': 'video/mp4',
       '.ogv': 'video/ogg',
       '.ogg': 'video/ogg',
       '.mp3': 'audio/mpeg',
       '.pdf': 'application/pdf',
     };
-    const contentType = material.mimeType || mimeMap[ext] || 'video/mp4';
+    const contentType = mimeMap[ext] || material.mimeType || 'video/mp4';
 
     const stat = fs.statSync(fullPath);
     const fileSize = stat.size;

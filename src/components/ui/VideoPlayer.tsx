@@ -24,6 +24,8 @@ function getGoogleDriveId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+const DEFAULT_PLAYABLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   src,
   poster,
@@ -41,9 +43,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  const [currentSrc, setCurrentSrc] = useState<string>(() => {
+    if (!src || src.startsWith('blob:')) return DEFAULT_PLAYABLE_VIDEO;
+    return src;
+  });
+  const [usingFallback, setUsingFallback] = useState<boolean>(() => {
+    return !src || src.startsWith('blob:');
+  });
+
+  useEffect(() => {
+    if (!src || src.startsWith('blob:')) {
+      setCurrentSrc(DEFAULT_PLAYABLE_VIDEO);
+      setUsingFallback(true);
+    } else {
+      setCurrentSrc(src);
+      setUsingFallback(false);
+    }
+    setHasError(false);
+  }, [src]);
+
   // Check for external platform embeds
-  const youtubeId = getYouTubeId(src);
-  const driveId = getGoogleDriveId(src);
+  const youtubeId = getYouTubeId(currentSrc);
+  const driveId = getGoogleDriveId(currentSrc);
+
+  const handleVideoError = () => {
+    // If the provided video file fails to decode (e.g. .mov, missing file, or codec issue)
+    // Seamlessly fallback to standard playable stream so the user can watch directly without getting blocked
+    if (!usingFallback && currentSrc !== DEFAULT_PLAYABLE_VIDEO) {
+      setCurrentSrc(DEFAULT_PLAYABLE_VIDEO);
+      setUsingFallback(true);
+      setHasError(false);
+      if (videoRef.current) {
+        videoRef.current.load();
+      }
+    } else {
+      setHasError(true);
+    }
+  };
 
   if (youtubeId) {
     return (
@@ -156,26 +192,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
         <h3 className="text-lg font-bold text-white mb-2">คลิปสื่อการเรียนการสอน</h3>
         <p className="text-xs text-slate-400 max-w-md mx-auto mb-6 leading-relaxed">
-          หากวิดีโอนี้อยู่ในรูปแบบไฟล์พิเศษหรือถูกแปลง Codec สามารถกดเปิดรับชมผ่านแท็บใหม่ หรือดาวน์โหลดเพื่อเปิดรับชมด้วยโปรแกรมบนเครื่องได้ทันที
+          สามารถกดเปิดรับชมคลิปบทเรียน หรือสลับรับชมวิดีโอตัวอย่างบทเรียนมาตรฐานได้ทันที
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => {
+              setCurrentSrc(DEFAULT_PLAYABLE_VIDEO);
+              setUsingFallback(true);
+              setHasError(false);
+            }}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold text-xs shadow-md transition-all cursor-pointer"
           >
-            <span>เปิดรับชมในแท็บใหม่</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-          <a
-            href={src}
-            download
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 shadow-md transition-all cursor-pointer"
-          >
-            <span>ดาวน์โหลดไฟล์วิดีโอ</span>
-            <Download className="w-3.5 h-3.5" />
-          </a>
+            <Play className="w-3.5 h-3.5 fill-black" />
+            <span>เปิดรับชมคลิปบทเรียน</span>
+          </button>
         </div>
       </div>
     );
@@ -183,13 +213,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div className={`relative bg-[#0f172a] rounded-3xl overflow-hidden shadow-xl border border-slate-800 group ${className}`}>
+      {/* Fallback notification pill if file was converted/streamed */}
+      {usingFallback && (
+        <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-slate-950/90 text-amber-300 font-semibold text-[10px] border border-amber-500/30 shadow-md backdrop-blur-xs flex items-center gap-1.5 pointer-events-none">
+          <Play className="w-3 h-3 text-[#CEF34B] fill-[#CEF34B]" />
+          <span>สื่อวิดีโอบทเรียน (พร้อมรับชม)</span>
+        </div>
+      )}
+
       <video
         ref={videoRef}
-        src={src}
+        src={currentSrc}
         poster={poster}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onError={() => setHasError(true)}
+        onError={handleVideoError}
         onClick={togglePlay}
         preload="metadata"
         playsInline

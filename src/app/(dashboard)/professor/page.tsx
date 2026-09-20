@@ -413,24 +413,23 @@ function ProfessorDashboardContent() {
         }
       } catch {}
 
-      // Prepare local object URL if file was picked
-      let localBlobUrl = '';
-      if (uploadedFile) {
-        try {
-          localBlobUrl = URL.createObjectURL(uploadedFile);
-        } catch {}
-      }
-
-      const effectiveVideoUrl = videoLinkUrl.trim() || localBlobUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-      const initialMaterialPayload = {
-        title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${newTitle.trim()}`,
-        type: materialType,
-        filePath: effectiveVideoUrl,
-        videoUrl: effectiveVideoUrl,
-        fileSize: uploadedFile ? uploadedFile.size : 52428800,
-        mimeType: uploadedFile ? uploadedFile.type : (materialType === 'VIDEO' ? 'video/mp4' : 'application/pdf'),
-        description: '',
-      };
+      // Prepare initial material:
+      // If user uploaded a physical file, we do NOT create a dummy initial material here
+      // because it will be uploaded directly via /api/courses/${id}/materials right below.
+      // If user provided a video link (YouTube, Drive, etc.), create the material with that link.
+      const initialMaterialPayload = uploadedFile
+        ? null
+        : videoLinkUrl.trim()
+        ? {
+            title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${newTitle.trim()}`,
+            type: materialType,
+            filePath: videoLinkUrl.trim(),
+            videoUrl: videoLinkUrl.trim(),
+            fileSize: 52428800,
+            mimeType: materialType === 'VIDEO' ? 'video/mp4' : 'application/pdf',
+            description: '',
+          }
+        : null;
 
       const res = await fetch('/api/courses', {
         method: 'POST',
@@ -508,7 +507,7 @@ function ProfessorDashboardContent() {
         durationText: '60:00 นาที',
         fileSizeText: uploadedFile ? `${(uploadedFile.size / (1024 * 1024)).toFixed(0)} MB` : '480 MB',
         uploadDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
-        videoUrl: effectiveVideoUrl,
+        videoUrl: videoLinkUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
         viewsCount: 0,
       };
       setExtraVideoClips((prev) => [...prev, newClip]);

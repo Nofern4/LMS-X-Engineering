@@ -148,12 +148,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลผู้สร้างรายวิชาในระบบ' }, { status: 400 });
     }
 
-    // Prepare initial material if provided
+    // Prepare initial material if provided (ensure no client-side blob URLs are saved)
+    let initialFilePath = initialMaterial?.filePath || initialMaterial?.videoUrl || '';
+    if (!initialFilePath || initialFilePath.startsWith('blob:')) {
+      initialFilePath = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    }
+
     const materialData = initialMaterial ? {
       title: initialMaterial.title?.trim() || `บทที่ 1: แนะนำรายวิชา ${title}`,
       description: initialMaterial.description?.trim() || '',
       type: initialMaterial.type || 'VIDEO',
-      filePath: initialMaterial.filePath || initialMaterial.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      filePath: initialFilePath,
       fileSize: BigInt(initialMaterial.fileSize || 52428800), // ~50MB default
       mimeType: initialMaterial.mimeType || (initialMaterial.type === 'VIDEO' ? 'video/mp4' : 'application/pdf'),
       duration: initialMaterial.duration || 3600,

@@ -569,13 +569,11 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                 src={
                   activeMaterial?.filePath &&
                   (activeMaterial.filePath.startsWith('http://') ||
-                    activeMaterial.filePath.startsWith('https://') ||
-                    activeMaterial.filePath.startsWith('blob:') ||
-                    activeMaterial.filePath.startsWith('data:'))
+                    activeMaterial.filePath.startsWith('https://'))
                     ? activeMaterial.filePath
-                    : `/api/materials/${activeMaterial.id}/stream`
+                    : `/api/materials/${activeMaterial?.id}/stream`
                 }
-                title={activeMaterial.title}
+                title={activeMaterial?.title}
                 poster="/assets/poster_placeholder.png"
               />
             ) : (
