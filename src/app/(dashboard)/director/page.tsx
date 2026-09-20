@@ -31,13 +31,13 @@ export default function DirectorDashboard() {
   }, []);
 
   const overview = data?.overview || {
-    totalStudents: 4609,
+    totalStudents: 854,
     totalProfessors: 4,
     totalApprovers: 5,
     totalCourses: 6,
     publishedCourses: 5,
     pendingCourses: 1,
-    totalEnrollments: 5552,
+    totalEnrollments: 854,
     totalMaterials: 28,
     totalVideos: 16,
     storageUsedGb: '7.21',

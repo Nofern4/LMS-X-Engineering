@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
-  const [totalUsers, setTotalUsers] = useState<number>(4615);
+  const [totalUsers, setTotalUsers] = useState<number>(854);
   const [settings, setSettings] = useState<any[]>([]);
 
   useEffect(() => {
