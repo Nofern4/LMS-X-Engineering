@@ -5,8 +5,7 @@ import {
   CheckCircle,
   XCircle,
   BookOpen,
-  ShieldCheck,
-  GraduationCap
+  ShieldCheck
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 
@@ -79,8 +78,8 @@ export default function CourseApproverDashboard() {
         <div className="absolute top-0 right-0 w-72 h-72 bg-[#CEF34B]/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Overview Metric Cards for Approver */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Overview Metric Card for Approver (Single card only) */}
+      <div className="max-w-sm">
         <div className="p-6 rounded-3xl bg-black text-white border border-black shadow-lg">
           <div className="flex items-center justify-between">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#CEF34B] text-black border border-[#CEF34B]">
@@ -95,40 +94,6 @@ export default function CourseApproverDashboard() {
           </h3>
           <p className="text-xs mt-1 text-slate-300">
             รอการพิจารณาอนุมัติเปิดสอนในระบบ
-          </p>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-white text-slate-900 border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-900 text-[#CEF34B] border border-slate-800">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <span className="px-3.5 py-1 rounded-full font-extrabold text-xs bg-slate-100 text-slate-700 border border-slate-200">
-              ทุกสาขาวิชา
-            </span>
-          </div>
-          <h3 className="text-base font-extrabold mt-4 text-slate-900">
-            มาตรฐานวิชาการ
-          </h3>
-          <p className="text-xs mt-1 text-slate-500">
-            เปิดกว้างให้นักศึกษาทุกหลักสูตรเข้าเรียนได้
-          </p>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-white text-slate-900 border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-100 text-emerald-700 border border-emerald-200">
-              <CheckCircle className="w-6 h-6 text-emerald-600" />
-            </div>
-            <span className="px-3.5 py-1 rounded-full font-extrabold text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
-              พร้อมใช้งาน
-            </span>
-          </div>
-          <h3 className="text-base font-extrabold mt-4 text-slate-900">
-            ระบบพิจารณาอัตโนมัติ
-          </h3>
-          <p className="text-xs mt-1 text-slate-500">
-            แจ้งผลอนุมัติกลับไปยังผู้สอนทันที
           </p>
         </div>
       </div>
