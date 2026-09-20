@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
-import { DemoRoleSwitcher } from '@/components/layout/DemoRoleSwitcher';
 import { RoleName } from '@/lib/rbac';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { usePageTranslator } from '@/lib/i18n/usePageTranslator';
@@ -99,9 +98,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-[#f8fafc] text-slate-900 relative transition-colors duration-300">
-      {/* Demo Role Switcher Bar */}
-      <DemoRoleSwitcher />
-
       {/* Main LMS Top Navigation Header */}
       <Header role={role} userName={userName} unreadNotifications={2} />
 

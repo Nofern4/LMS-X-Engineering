@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import {
   BookOpen,
@@ -40,89 +41,74 @@ import { VideoPlayer } from '@/components/ui/VideoPlayer';
 
 const DEFAULT_BRANCH_STUDENTS: Record<string, any[]> = {
   CS101: [
-    { id: 'cs-1', studentId: 'XK-65010042', name: 'สมชาย ช่างกล (Somchai)', status: 'APPROVED' },
-    { id: 'cs-2', studentId: 'XK-65010101', name: 'ปิยะพงษ์ วิศวการ', status: 'APPROVED' },
-    { id: 'cs-3', studentId: 'XK-65010102', name: 'กานดา โค้ดดิ้ง', status: 'APPROVED' },
-    { id: 'cs-4', studentId: 'XK-65010103', name: 'ธีรภัทร ชิปเซ็ต', status: 'APPROVED' },
-    { id: 'cs-5', studentId: 'XK-65010104', name: 'ชยพล เน็ตเวิร์ก', status: 'APPROVED' },
-    { id: 'cs-6', studentId: 'XK-65010105', name: 'พัชราภรณ์ ดาต้าเบส', status: 'APPROVED' },
-    { id: 'cs-7', studentId: 'XK-65010106', name: 'กฤษฎา ระบบฝังตัว', status: 'APPROVED' },
-    { id: 'cs-8', studentId: 'XK-65010107', name: 'นภัสสร อัลกอริทึม', status: 'APPROVED' },
-    { id: 'cs-9', studentId: 'XK-65010108', name: 'ธนวัฒน์ ปัญญาประดิษฐ์', status: 'APPROVED' },
-    { id: 'cs-10', studentId: 'XK-65010109', name: 'รัชชานนท์ คลาวด์คอมพิวติ้ง', status: 'APPROVED' },
-    { id: 'cs-11', studentId: 'XK-65010110', name: 'ศุภกานต์ ไซเบอร์ซีเคียวริตี้', status: 'APPROVED' },
-    { id: 'cs-12', studentId: 'XK-65010111', name: 'มนัสวิน สถาปัตยกรรมคอมพ์', status: 'APPROVED' },
-    { id: 'cs-13', studentId: 'XK-65010112', name: 'ฐิติพร วงจรดิจิทัล', status: 'APPROVED' },
-    { id: 'cs-14', studentId: 'XK-65010113', name: 'พงศธร คอมไพเลอร์', status: 'APPROVED' },
-    { id: 'cs-15', studentId: 'XK-65010114', name: 'ปวริศร์ โอเปอเรติงซิสเต็ม', status: 'APPROVED' },
+    { id: 'cs-1', studentId: 'XK-65010042', name: 'สมชาย ช่างกล (Somchai)', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-2', studentId: 'XK-65010101', name: 'ปิยะพงษ์ วิศวการ', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-3', studentId: 'XK-65010102', name: 'กานดา โค้ดดิ้ง', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-4', studentId: 'XK-65010103', name: 'ธีรภัทร ชิปเซ็ต', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-5', studentId: 'XK-65010104', name: 'ชยพล เน็ตเวิร์ก', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-6', studentId: 'XK-65010105', name: 'พัชราภรณ์ ดาต้าเบส', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-7', studentId: 'XK-65010106', name: 'กฤษฎา ระบบฝังตัว', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-8', studentId: 'XK-65010107', name: 'นภัสสร อัลกอริทึม', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-9', studentId: 'XK-65010108', name: 'ธนวัฒน์ ปัญญาประดิษฐ์', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-10', studentId: 'XK-65010109', name: 'รัชชานนท์ คลาวด์คอมพิวติ้ง', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-11', studentId: 'XK-65010110', name: 'ศุภกานต์ ไซเบอร์ซีเคียวริตี้', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-12', studentId: 'XK-65010111', name: 'มนัสวิน สถาปัตยกรรมคอมพ์', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-13', studentId: 'XK-65010112', name: 'ฐิติพร วงจรดิจิทัล', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-14', studentId: 'XK-65010113', name: 'พงศธร คอมไพเลอร์', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
+    { id: 'cs-15', studentId: 'XK-65010114', name: 'ปวริศร์ โอเปอเรติงซิสเต็ม', courseCode: 'CS101', category: 'วิศวกรรมคอมพิวเตอร์', status: 'APPROVED' },
   ],
   ME201: [
-    { id: 'me-1', studentId: 'XK-65020042', name: 'สมศักดิ์ กลึงเหล็ก', status: 'APPROVED' },
-    { id: 'me-2', studentId: 'XK-65020101', name: 'สุรชัย ช่างกลึง', status: 'APPROVED' },
-    { id: 'me-3', studentId: 'XK-65020102', name: 'ธนพล ไฮดรอลิก', status: 'APPROVED' },
-    { id: 'me-4', studentId: 'XK-65020103', name: 'วรวิทย์ นิวแมติกส์', status: 'APPROVED' },
-    { id: 'me-5', studentId: 'XK-65020104', name: 'กิตติพงษ์ เขียนแบบช่าง', status: 'APPROVED' },
-    { id: 'me-6', studentId: 'XK-65020105', name: 'ประสิทธิ์ งานเชื่อมโลหะ', status: 'APPROVED' },
-    { id: 'me-7', studentId: 'XK-65020106', name: 'เจษฎา วัสดุวิศวกรรม', status: 'APPROVED' },
-    { id: 'me-8', studentId: 'XK-65020107', name: 'ชานนท์ กลศาสตร์ของแข็ง', status: 'APPROVED' },
-    { id: 'me-9', studentId: 'XK-65020108', name: 'เอกลักษณ์ เครื่องมือวัดละเอียด', status: 'APPROVED' },
-    { id: 'me-10', studentId: 'XK-65020109', name: 'วุฒิภัทร โลหะวิทยา', status: 'APPROVED' },
-    { id: 'me-11', studentId: 'XK-65020110', name: 'ธนาคาร ควบคุมซีเอ็นซี (CNC)', status: 'APPROVED' },
-    { id: 'me-12', studentId: 'XK-65020111', name: 'อนุสรณ์ กรรมวิธีการผลิต', status: 'APPROVED' },
-    { id: 'me-13', studentId: 'XK-65020112', name: 'ศรายุทธ ออกแบบชิ้นส่วนเครื่องกล', status: 'APPROVED' },
-    { id: 'me-14', studentId: 'XK-65020113', name: 'ชาญณรงค์ ถ่ายโอนความร้อน', status: 'APPROVED' },
+    { id: 'me-1', studentId: 'XK-65020042', name: 'สมศักดิ์ กลึงเหล็ก', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-2', studentId: 'XK-65020101', name: 'สุรชัย ช่างกลึง', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-3', studentId: 'XK-65020102', name: 'ธนพล ไฮดรอลิก', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-4', studentId: 'XK-65020103', name: 'วรวิทย์ นิวแมติกส์', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-5', studentId: 'XK-65020104', name: 'กิตติพงษ์ เขียนแบบช่าง', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-6', studentId: 'XK-65020105', name: 'ประสิทธิ์ งานเชื่อมโลหะ', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-7', studentId: 'XK-65020106', name: 'เจษฎา วัสดุวิศวกรรม', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-8', studentId: 'XK-65020107', name: 'ชานนท์ กลศาสตร์ของแข็ง', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-9', studentId: 'XK-65020108', name: 'เอกลักษณ์ เครื่องมือวัดละเอียด', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-10', studentId: 'XK-65020109', name: 'วุฒิภัทร โลหะวิทยา', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-11', studentId: 'XK-65020110', name: 'ธนาคาร ควบคุมซีเอ็นซี (CNC)', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-12', studentId: 'XK-65020111', name: 'อนุสรณ์ กรรมวิธีการผลิต', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-13', studentId: 'XK-65020112', name: 'ศรายุทธ ออกแบบชิ้นส่วนเครื่องกล', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
+    { id: 'me-14', studentId: 'XK-65020113', name: 'ชาญณรงค์ ถ่ายโอนความร้อน', courseCode: 'ME201', category: 'ช่างกลโรงงาน', status: 'APPROVED' },
   ],
   EE305: [
-    { id: 'ee-1', studentId: 'XK-65010088', name: 'สมศักดิ์ ไฟฟ้า (Somsak)', status: 'APPROVED' },
-    { id: 'ee-2', studentId: 'XK-65030101', name: 'อนุสรณ์ หม้อแปลงไฟฟ้า', status: 'APPROVED' },
-    { id: 'ee-3', studentId: 'XK-65030102', name: 'ศุภชัย พาวเวอร์ซิสเต็ม', status: 'APPROVED' },
-    { id: 'ee-4', studentId: 'XK-65030103', name: 'เกียรติศักดิ์ วงจรไฟฟ้าแรงสูง', status: 'APPROVED' },
-    { id: 'ee-5', studentId: 'XK-65030104', name: 'ปรเมษฐ์ ควบคุมมอเตอร์', status: 'APPROVED' },
-    { id: 'ee-6', studentId: 'XK-65030105', name: 'วีรยุทธ รีเลย์ป้องกัน', status: 'APPROVED' },
-    { id: 'ee-7', studentId: 'XK-65030106', name: 'สันติภาพ พลังงานหมุนเวียน', status: 'APPROVED' },
-    { id: 'ee-8', studentId: 'XK-65030107', name: 'นพรัตน์ ติดตั้งไฟฟ้าอาคาร', status: 'APPROVED' },
-    { id: 'ee-9', studentId: 'XK-65030108', name: 'ชวิน โปรแกรมเมเบิลลอจิก (PLC)', status: 'APPROVED' },
-    { id: 'ee-10', studentId: 'XK-65030109', name: 'ก้องภพ ระบบส่งจ่ายกำลังไฟฟ้า', status: 'APPROVED' },
-    { id: 'ee-11', studentId: 'XK-65030110', name: 'อัครเดช ตู้สวิตช์บอร์ด', status: 'APPROVED' },
-    { id: 'ee-12', studentId: 'XK-65030111', name: 'สหรัฐ เครื่องกำเนิดไฟฟ้า', status: 'APPROVED' },
-    { id: 'ee-13', studentId: 'XK-65030112', name: 'ธนากร อิเล็กทรอนิกส์กำลัง', status: 'APPROVED' },
-  ],
-  AUTO101: [
-    { id: 'auto-1', studentId: 'XK-65040101', name: 'ประสิทธิ์ ช่างยนต์', status: 'APPROVED' },
-    { id: 'auto-2', studentId: 'XK-65040102', name: 'ชาญวิทย์ เครื่องยนต์ดีเซล', status: 'APPROVED' },
-    { id: 'auto-3', studentId: 'XK-65040103', name: 'ณัฐพงษ์ ระบบหัวฉีดอิเล็กทรอนิกส์', status: 'APPROVED' },
-    { id: 'auto-4', studentId: 'XK-65040104', name: 'อภิสิทธิ์ กลไกส่งกำลัง', status: 'APPROVED' },
-    { id: 'auto-5', studentId: 'XK-65040105', name: 'วัชรพงษ์ ยานยนต์ไฟฟ้า (EV)', status: 'APPROVED' },
-    { id: 'auto-6', studentId: 'XK-65040106', name: 'พิเชษฐ์ ช่วงล่างและเบรก', status: 'APPROVED' },
-    { id: 'auto-7', studentId: 'XK-65040107', name: 'บรรพต ระบบปรับอากาศยานยนต์', status: 'APPROVED' },
-    { id: 'auto-8', studentId: 'XK-65040108', name: 'ภูริช ช่างเครื่องยนต์เบนซิน', status: 'APPROVED' },
-    { id: 'auto-9', studentId: 'XK-65040109', name: 'ชลิต ระบบไฮบริด', status: 'APPROVED' },
-    { id: 'auto-10', studentId: 'XK-65040110', name: 'สิทธิชัย แบตเตอรี่กำลังสูง', status: 'APPROVED' },
-    { id: 'auto-11', studentId: 'XK-65040111', name: 'อดิศร ตรวจวินิจฉัย OBD-II', status: 'APPROVED' },
-    { id: 'auto-12', studentId: 'XK-65040112', name: 'เมธาสิทธิ์ วิศวกรรมระบบขับเคลื่อน', status: 'APPROVED' },
+    { id: 'ee-1', studentId: 'XK-65010088', name: 'สมศักดิ์ ไฟฟ้า (Somsak)', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-2', studentId: 'XK-65030101', name: 'อนุสรณ์ หม้อแปลงไฟฟ้า', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-3', studentId: 'XK-65030102', name: 'ศุภชัย พาวเวอร์ซิสเต็ม', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-4', studentId: 'XK-65030103', name: 'เกียรติศักดิ์ วงจรไฟฟ้าแรงสูง', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-5', studentId: 'XK-65030104', name: 'ปรเมษฐ์ ควบคุมมอเตอร์', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-6', studentId: 'XK-65030105', name: 'วีรยุทธ รีเลย์ป้องกัน', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-7', studentId: 'XK-65030106', name: 'สันติภาพ พลังงานหมุนเวียน', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-8', studentId: 'XK-65030107', name: 'นพรัตน์ ติดตั้งไฟฟ้าอาคาร', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-9', studentId: 'XK-65030108', name: 'ชวิน โปรแกรมเมเบิลลอจิก (PLC)', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-10', studentId: 'XK-65030109', name: 'ก้องภพ ระบบส่งจ่ายกำลังไฟฟ้า', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-11', studentId: 'XK-65030110', name: 'อัครเดช ตู้สวิตช์บอร์ด', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-12', studentId: 'XK-65030111', name: 'สหรัฐ เครื่องกำเนิดไฟฟ้า', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
+    { id: 'ee-13', studentId: 'XK-65030112', name: 'ธนากร อิเล็กทรอนิกส์กำลัง', courseCode: 'EE305', category: 'ช่างไฟฟ้ากำลัง', status: 'APPROVED' },
   ],
   SE302: [
-    { id: 'se-1', studentId: 'XK-65050101', name: 'วรัญญา สถาปัตยกรรมซอฟต์แวร์', status: 'APPROVED' },
-    { id: 'se-2', studentId: 'XK-65050102', name: 'ธนภัทร ไมโครเซอร์วิส', status: 'APPROVED' },
-    { id: 'se-3', studentId: 'XK-65050103', name: 'ศรุต คลีนโค้ด', status: 'APPROVED' },
-    { id: 'se-4', studentId: 'XK-65050104', name: 'อภิวัฒน์ เดฟออปส์ (DevOps)', status: 'APPROVED' },
-    { id: 'se-5', studentId: 'XK-65050105', name: 'ชญาดา ควบคุมคุณภาพซอฟต์แวร์', status: 'APPROVED' },
-    { id: 'se-6', studentId: 'XK-65050106', name: 'ภานุมาศ ฟูลสแต็ก', status: 'APPROVED' },
-    { id: 'se-7', studentId: 'XK-65050107', name: 'ภูวดล สแครมมาสเตอร์', status: 'APPROVED' },
-    { id: 'se-8', studentId: 'XK-65050108', name: 'ศิรชัช ระบบกระจายงาน', status: 'APPROVED' },
-    { id: 'se-9', studentId: 'XK-65050109', name: 'กมลชนก คลาวด์เนทีฟ', status: 'APPROVED' },
-    { id: 'se-10', studentId: 'XK-65050110', name: 'อัศวิน ทดสอบระบบอัตโนมัติ', status: 'APPROVED' },
-    { id: 'se-11', studentId: 'XK-65050111', name: 'พิชญ์พงศ์ ซอฟต์แวร์ซิเคียวริตี้', status: 'APPROVED' },
-    { id: 'se-12', studentId: 'XK-65050112', name: 'ชาคริต วิศวกรรมข้อมูลขนาดใหญ่', status: 'APPROVED' },
+    { id: 'se-1', studentId: 'XK-65050101', name: 'วรัญญา สถาปัตยกรรมซอฟต์แวร์', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-2', studentId: 'XK-65050102', name: 'ธนภัทร ไมโครเซอร์วิส', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-3', studentId: 'XK-65050103', name: 'ศรุต คลีนโค้ด', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-4', studentId: 'XK-65050104', name: 'อภิวัฒน์ เดฟออปส์ (DevOps)', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-5', studentId: 'XK-65050105', name: 'ชญาดา ควบคุมคุณภาพซอฟต์แวร์', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-6', studentId: 'XK-65050106', name: 'ภานุมาศ ฟูลสแต็ก', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-7', studentId: 'XK-65050107', name: 'ภูวดล สแครมมาสเตอร์', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-8', studentId: 'XK-65050108', name: 'ศิรชัช ระบบกระจายงาน', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-9', studentId: 'XK-65050109', name: 'กมลชนก คลาวด์เนทีฟ', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-10', studentId: 'XK-65050110', name: 'อัศวิน ทดสอบระบบอัตโนมัติ', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-11', studentId: 'XK-65050111', name: 'พิชญ์พงศ์ ซอฟต์แวร์ซิเคียวริตี้', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
+    { id: 'se-12', studentId: 'XK-65050112', name: 'ชาคริต วิศวกรรมข้อมูลขนาดใหญ่', courseCode: 'SE302', category: 'วิศวกรรมซอฟต์แวร์', status: 'APPROVED' },
   ],
 };
 
 const BRANCH_STATS: Record<string, { enrolled: number; completed: number; rate: string }> = {
-  ALL: { enrolled: 854, completed: 746, rate: '87.4%' },
+  ALL: { enrolled: 716, completed: 626, rate: '87.4%' },
   CS101: { enrolled: 245, completed: 218, rate: '89.0%' },
   ME201: { enrolled: 182, completed: 156, rate: '85.7%' },
   EE305: { enrolled: 164, completed: 142, rate: '86.6%' },
-  AUTO101: { enrolled: 138, completed: 120, rate: '87.0%' },
   SE302: { enrolled: 125, completed: 110, rate: '88.0%' },
 };
 
@@ -233,51 +219,54 @@ const PROFESSOR_VIDEO_CLIPS: ProfessorVideoClip[] = [
     viewsCount: 760,
   },
   {
-    id: 'vid-auto-1',
-    courseCode: 'AUTO101',
-    courseTitle: 'เทคโนโลยีช่างยนต์และระบบส่งกำลัง (Automotive Technology)',
-    category: 'เทคโนโลยีช่างยนต์',
-    title: 'บทที่ 1: พื้นฐานระบบเครื่องยนต์สันดาปภายในและการวินิจฉัยปัญหา',
-    description: 'หลักการทำงาน 4 จังหวะของเครื่องยนต์เบนซินและดีเซล, ระบบวาล์ว, ระบบหล่อลื่น และการใช้เครื่องสแกน OBD-II',
-    durationText: '50:00 นาที',
-    fileSizeText: '460 MB',
+    id: 'vid-me-1',
+    courseCode: 'ME201',
+    courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน (Mechanical Engineering)',
+    category: 'ช่างกลโรงงาน',
+    title: 'บทที่ 1: พื้นฐานงานกลึง งานกัดโลหะ และความปลอดภัยในโรงงานช่างกล',
+    description: 'หลักการทำงานของเครื่องกลึง เครื่องกัด และการเลือกใช้เครื่องมือตัดสำหรับโลหะแต่ละชนิดตามมาตรฐานสากล',
+    durationText: '55:00 นาที',
+    fileSizeText: '470 MB',
     uploadDate: '2 ก.ย. 2026',
     videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    viewsCount: 710,
+    viewsCount: 780,
   },
   {
-    id: 'vid-auto-2',
-    courseCode: 'AUTO101',
-    courseTitle: 'เทคโนโลยีช่างยนต์และระบบส่งกำลัง (Automotive Technology)',
-    category: 'เทคโนโลยีช่างยนต์',
-    title: 'บทที่ 2: ระบบยานยนต์ไฟฟ้า EV และแบตเตอรี่แรงดันสูง (High-Voltage Battery)',
-    description: 'ระบบขับเคลื่อนมอเตอร์ไฟฟ้า (Inverter & Traction Motor), เซลล์แบตเตอรี่ และมาตรฐานความปลอดภัยในงานช่างยานยนต์ EV',
-    durationText: '60:00 นาที',
-    fileSizeText: '530 MB',
-    uploadDate: '8 ก.ย. 2026',
+    id: 'vid-me-2',
+    courseCode: 'ME201',
+    courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน (Mechanical Engineering)',
+    category: 'ช่างกลโรงงาน',
+    title: 'บทที่ 2: การเขียนโปรแกรมเครื่องจักร CNC และการวัดละเอียดทางวิศวกรรม',
+    description: 'การเขียนโค้ด G-Code / M-Code สำหรับเครื่องกลึง CNC และการใช้อุปกรณ์วัดละเอียดเกจบล็อก เวอร์เนียร์ ไมโครมิเตอร์',
+    durationText: '65:00 นาที',
+    fileSizeText: '540 MB',
+    uploadDate: '6 ก.ย. 2026',
     videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4',
-    viewsCount: 890,
+    viewsCount: 860,
   },
 ];
 
 function ProfessorDashboardContent() {
+  const router = useRouter();
+  const coursesRef = useRef<HTMLDivElement>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [courseStudents, setCourseStudents] = useState<Record<string, any[]>>(DEFAULT_BRANCH_STUDENTS);
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>('ALL');
   const [showAllStudents, setShowAllStudents] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [newlyCreatedCode, setNewlyCreatedCode] = useState<string | null>(null);
 
   // Video clips filter & active preview modal state
   const [selectedVideoCourseFilter, setSelectedVideoCourseFilter] = useState<string>('ALL');
   const [activeVideoModal, setActiveVideoModal] = useState<ProfessorVideoClip | null>(null);
+  const [extraVideoClips, setExtraVideoClips] = useState<ProfessorVideoClip[]>([]);
 
-  // Professor Taught Courses Selector List
+  // Professor Taught Courses Selector List (4 Core Disciplines)
   const [professorCourses, setProfessorCourses] = useState([
     { code: 'CS101', label: 'CS101 (วิศวกรรมคอมพิวเตอร์)', category: 'วิศวกรรมคอมพิวเตอร์' },
     { code: 'SE302', label: 'SE302 (วิศวกรรมซอฟต์แวร์)', category: 'วิศวกรรมซอฟต์แวร์' },
     { code: 'ME201', label: 'ME201 (ช่างกลโรงงาน)', category: 'ช่างกลโรงงาน' },
     { code: 'EE305', label: 'EE305 (ช่างไฟฟ้ากำลัง)', category: 'ช่างไฟฟ้ากำลัง' },
-    { code: 'AUTO101', label: 'AUTO101 (เทคโนโลยีช่างยนต์)', category: 'เทคโนโลยีช่างยนต์' },
   ]);
 
   // Create Course Modal State (2-Step Wizard)
@@ -378,19 +367,33 @@ function ProfessorDashboardContent() {
   const handleCreateCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (createStep === 1) {
-      if (!newCode.trim() || !newTitle.trim()) return;
+      if (!newTitle.trim()) return;
+      if (!newCode.trim()) {
+        setNewCode(`XK-${Math.floor(100 + Math.random() * 900)}`);
+      }
       setCreateStep(2);
       return;
     }
 
     setIsSubmittingCourse(true);
     try {
-      await fetch('/api/courses', {
+      const codeToUse = newCode.trim() || `XK-${Math.floor(100 + Math.random() * 900)}`;
+
+      let userPayload: any = { id: 'prof-1', roles: ['PROFESSOR'] };
+      try {
+        const sess = localStorage.getItem('user_session');
+        if (sess) {
+          const parsed = JSON.parse(sess);
+          userPayload = { id: parsed.id || 'prof-1', email: parsed.email, roles: parsed.roles || ['PROFESSOR'] };
+        }
+      } catch {}
+
+      const res = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user: { id: 'prof-1', roles: ['PROFESSOR'] },
-          code: newCode.trim(),
+          user: userPayload,
+          code: codeToUse,
           title: newTitle.trim(),
           description: newDescription.trim() || 'รายวิชาใหม่ประจำภาคเรียน',
           category: newCategory,
@@ -401,15 +404,44 @@ function ProfessorDashboardContent() {
         }),
       });
 
-      const newCourseCode = newCode.trim();
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'เกิดข้อผิดพลาดในการสร้างรายวิชา');
+        setIsSubmittingCourse(false);
+        return;
+      }
+
+      const newCourseCode = codeToUse;
+      const savedTitle = newTitle.trim();
+      const savedCategory = newCategory;
+      const savedDescription = newDescription.trim() || 'รายวิชาใหม่ประจำภาคเรียน';
+      const savedCourseId = data.course?.id || '';
+
       const newCourseItem = {
         code: newCourseCode,
-        label: `${newCourseCode} (${newCategory})`,
-        category: newCategory,
+        label: `${newCourseCode} (${savedCategory})`,
+        category: savedCategory,
       };
 
       setProfessorCourses((prev) => [...prev, newCourseItem]);
       setSelectedCourseCode(newCourseCode);
+      setNewlyCreatedCode(newCourseCode);
+
+      // Add a sample video clip for the new course so students see content
+      const newClip: ProfessorVideoClip = {
+        id: `vid-new-${Date.now()}`,
+        courseCode: newCourseCode,
+        courseTitle: savedTitle,
+        category: savedCategory,
+        title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${savedTitle}`,
+        description: savedDescription,
+        durationText: '60:00 นาที',
+        fileSizeText: '480 MB',
+        uploadDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        viewsCount: 0,
+      };
+      setExtraVideoClips((prev) => [...prev, newClip]);
 
       // Seed initial student for created course
       setCourseStudents((prev) => ({
@@ -424,15 +456,35 @@ function ProfessorDashboardContent() {
         ]
       }));
 
-      setCreateSuccessMsg(`สร้างรายวิชา ${newCourseCode} - ${newTitle.trim()} พร้อมสื่อเรียนสำเร็จแล้ว!`);
-      setTimeout(() => setCreateSuccessMsg(null), 4000);
+      // Re-fetch courses list from API
+      fetch('/api/courses')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.courses) setCourses(d.courses);
+        })
+        .catch(() => {});
+
+      setCreateSuccessMsg(`⏳ ส่งรายวิชา "${savedTitle}" (${newCourseCode}) เพื่อรอผู้อนุมัติตรวจสอบแล้ว — กรุณารอการอนุมัติก่อนเผยแพร่ให้นักศึกษาเห็น`);
+      setTimeout(() => setCreateSuccessMsg(null), 8000);
 
       // Reset form & close modal
       setNewCode('');
       setNewTitle('');
       setNewDescription('');
+      setMaterialTitle('');
+      setUploadedFileName(null);
+      setHasGoogleFormsQuiz(false);
+      setGoogleFormsUrl('');
       setCreateStep(1);
       setIsCreateModalOpen(false);
+
+      // Scroll to courses section after short delay
+      setTimeout(() => {
+        coursesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 400);
+
+      // Clear highlight after 5 seconds
+      setTimeout(() => setNewlyCreatedCode(null), 5000);
     } catch (err) {
       console.error(err);
     } finally {
@@ -441,7 +493,7 @@ function ProfessorDashboardContent() {
   };
 
   const allStudents = React.useMemo(() => {
-    // Interleave students from each branch so "ทั้งหมด" displays a rich mix across branches
+    // Interleave students from each branch with dedup by studentId or name
     const courseCodes = Object.keys(courseStudents);
     const maxLen = Math.max(...courseCodes.map((code) => (courseStudents[code] || []).length), 0);
     const list: any[] = [];
@@ -451,7 +503,8 @@ function ProfessorDashboardContent() {
       for (const code of courseCodes) {
         const s = courseStudents[code]?.[i];
         if (s) {
-          const key = s.studentId || s.id || s.name;
+          // Use studentId as primary key, fallback to name (avoid using enrollment id which is always unique)
+          const key = s.studentId && s.studentId !== 'XK-65010042' ? s.studentId : s.name;
           if (key && !seen.has(key)) {
             seen.add(key);
             list.push(s);
@@ -459,14 +512,32 @@ function ProfessorDashboardContent() {
         }
       }
     }
-    return list;
+    // Cap at the canonical total to keep data consistent with the stats card
+    return list.slice(0, BRANCH_STATS.ALL.enrolled);
   }, [courseStudents]);
 
   const currentCourse = courses.find((c) => c.code === selectedCourseCode);
+
+  // For per-course view: deduplicate by studentId/name, then cap at BRANCH_STATS enrolled count
+  const getRawStudents = (code: string) => {
+    const raw = courseStudents[code] || [];
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (const s of raw) {
+      const key = s.studentId && s.studentId !== 'XK-65010042' ? s.studentId : s.name;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        deduped.push(s);
+      }
+    }
+    const cap = BRANCH_STATS[code]?.enrolled;
+    return cap ? deduped.slice(0, cap) : deduped;
+  };
+
   const currentStudents = selectedCourseCode === 'ALL'
     ? allStudents
-    : (courseStudents[selectedCourseCode] || []);
-  
+    : getRawStudents(selectedCourseCode);
+
   const currentStats = BRANCH_STATS[selectedCourseCode] || {
     enrolled: currentStudents.length || 0,
     completed: Math.round((currentStudents.length || 0) * 0.88),
@@ -479,24 +550,21 @@ function ProfessorDashboardContent() {
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
       {/* Header Banner for Teacher Portal */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden text-white">
-        <div className="space-y-1 z-10">
+        <div className="z-10">
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             ผศ.ดร.วิชาญ สอนดี
           </h1>
-          <p className="text-xs text-slate-400 font-medium">
-            แดชบอร์ดข้อมูลการเรียนการสอน • สำหรับอาจารย์และบุคลากรสถาบัน
-          </p>
+
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 z-10">
-          <a
-            href="#classes-offered"
-            className="rounded-full font-extrabold text-xs py-3 px-5 bg-white/10 hover:bg-white/20 text-[#CEF34B] border border-white/10 hover:border-[#CEF34B]/50 transition-all flex items-center gap-2 cursor-pointer shadow-md transform hover:scale-105"
+          <Link
+            href="/professor/classes"
+            className="inline-flex items-center gap-2 rounded-full font-extrabold text-xs py-3 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/20 shadow-md transition-all cursor-pointer"
           >
             <Video className="w-4 h-4 text-[#CEF34B]" />
-            <span>คลาสที่เปิดสอน ({PROFESSOR_VIDEO_CLIPS.length} คลิป)</span>
-          </a>
-
+            <span>คลาสที่เปิดสอน (คลิปวิดีโอ)</span>
+          </Link>
           <Button
             variant="primary"
             size="md"
@@ -509,26 +577,26 @@ function ProfessorDashboardContent() {
         </div>
       </div>
 
-      {/* Success Notification Banner */}
+      {/* Pending Approval Notification Banner */}
       {createSuccessMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-extrabold text-xs flex items-center gap-3 animate-fadeIn shadow-xs">
-          <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 font-extrabold text-xs flex items-center gap-3 animate-fadeIn shadow-xs">
+          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
           <span>{createSuccessMsg}</span>
         </div>
       )}
 
       {/* Metric Cards - Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
+        <Link href="/professor/classes" className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4 hover:border-slate-800 transition-all cursor-pointer">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 text-[#CEF34B] flex items-center justify-center border border-slate-800 shadow-xs">
             <BookOpen className="w-6 h-6 text-[#CEF34B]" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500">รายวิชาที่สอน</p>
-            <p className="text-xl font-extrabold text-slate-900">{professorCourses.length} รายวิชา</p>
+            <p className="text-xs font-semibold text-slate-500">คลาสที่เปิดสอน</p>
+            <p className="text-xl font-extrabold text-slate-900">{professorCourses.length} คลาส</p>
             <p className="text-[10px] text-slate-500 font-bold">มหาวิทยาลัย Xการช่าง</p>
           </div>
-        </div>
+        </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-xs">
@@ -558,144 +626,9 @@ function ProfessorDashboardContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500">นักศึกษาในความดูแลทั้งหมด</p>
-            <p className="text-xl font-extrabold text-slate-900">854 คน</p>
+            <p className="text-xl font-extrabold text-slate-900">{BRANCH_STATS.ALL.enrolled.toLocaleString()} คน</p>
             <p className="text-[10px] text-slate-500">ข้อมูลจริงตามฐานข้อมูล</p>
           </div>
-        </div>
-      </div>
-
-      {/* SECTION: คลาสที่เปิดสอน (คลิปวิดีโอที่อาจารย์เคยลง) */}
-      <div id="classes-offered" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-4">
-        <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-[#CEF34B] flex items-center justify-center font-bold shadow-xs flex-shrink-0">
-              <Video className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
-                <span>คลาสที่เปิดสอน</span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#CEF34B] text-black border border-[#bce038]">
-                  {selectedVideoCourseFilter === 'ALL'
-                    ? `${PROFESSOR_VIDEO_CLIPS.length} คลิปวิดีโอ`
-                    : `${PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === selectedVideoCourseFilter).length} คลิปวิดีโอ`}
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 font-medium">
-                สื่อวิดีโอบทเรียนที่ ผศ.ดร.วิชาญ สอนดี ได้บันทึกและเผยแพร่ในแต่ละรายวิชา
-              </p>
-            </div>
-          </div>
-
-          {/* Video Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button
-              onClick={() => setSelectedVideoCourseFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                selectedVideoCourseFilter === 'ALL'
-                  ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                  : 'text-slate-700 hover:text-black bg-white/60'
-              }`}
-            >
-              ทั้งหมด ({PROFESSOR_VIDEO_CLIPS.length})
-            </button>
-            {['CS101', 'EE305', 'SE302', 'AUTO101'].map((code) => {
-              const count = PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === code).length;
-              return (
-                <button
-                  key={code}
-                  onClick={() => setSelectedVideoCourseFilter(code)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                    selectedVideoCourseFilter === code
-                      ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                      : 'text-slate-700 hover:text-black bg-white/60'
-                  }`}
-                >
-                  {code} ({count})
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Video Cards Grid */}
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {(selectedVideoCourseFilter === 'ALL'
-            ? PROFESSOR_VIDEO_CLIPS
-            : PROFESSOR_VIDEO_CLIPS.filter((v) => v.courseCode === selectedVideoCourseFilter)
-          ).map((clip) => (
-            <div
-              key={clip.id}
-              className="group bg-white rounded-2xl border border-slate-200 hover:border-slate-900 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden"
-            >
-              <div>
-                {/* Video Thumbnail Preview Header */}
-                <div
-                  onClick={() => setActiveVideoModal(clip)}
-                  className="h-44 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-4 relative flex flex-col justify-between text-white cursor-pointer group-hover:brightness-105 transition-all overflow-hidden"
-                >
-                  {/* Subtle Grid Accent */}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] pointer-events-none" />
-
-                  {/* Top Badges */}
-                  <div className="flex items-center justify-between z-10">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-black/60 text-[#CEF34B] border border-[#CEF34B]/30 backdrop-blur-md">
-                      {clip.courseCode} • {clip.category}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20 backdrop-blur-md flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-[#CEF34B]" />
-                      {clip.durationText}
-                    </span>
-                  </div>
-
-                  {/* Center Play Button Overlay */}
-                  <div className="flex items-center justify-center my-auto z-10">
-                    <div className="w-12 h-12 rounded-full bg-[#CEF34B] text-black flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-300">
-                      <Play className="w-5 h-5 ml-0.5 fill-black text-black" />
-                    </div>
-                  </div>
-
-                  {/* Bottom Meta */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-300 z-10">
-                    <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                      อนุมัติเผยแพร่แล้ว
-                    </span>
-                    <span className="text-slate-400">{clip.fileSizeText}</span>
-                  </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="p-5 space-y-2">
-                  <h3 className="text-sm font-extrabold text-slate-900 line-clamp-2 leading-snug">
-                    {clip.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                    {clip.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Card Footer Actions */}
-              <div className="px-5 pb-5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveVideoModal(clip)}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-black text-[#CEF34B] font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
-                >
-                  <Play className="w-3.5 h-3.5 fill-[#CEF34B]" />
-                  <span>เปิดดูคลิปวิดีโอ</span>
-                </button>
-                <Link
-                  href={`/learning/${clip.courseCode.toLowerCase()}`}
-                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
-                  title="ไปที่ห้องเรียน"
-                >
-                  <span>ห้องเรียน</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -705,17 +638,15 @@ function ProfessorDashboardContent() {
           <div>
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-slate-900" />
-              <span>
-                รายชื่อนักศึกษาที่ลงเรียน{' '}
-                {selectedCourseCode === 'ALL'
-                  ? '- ทั้งหมด'
-                  : `- ${selectedCourseCode} (${professorCourses.find((c) => c.code === selectedCourseCode)?.category || selectedCourseCode})`}
-              </span>
+              <span>ภาพรวมนักศึกษาที่เข้าเรียนกับเรา {selectedCourseCode === 'ALL' ? '(4 รายวิชาหลัก)' : `- ${selectedCourseCode}`}</span>
             </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              CS101 (วิศวกรรมคอมพิวเตอร์) • SE302 (วิศวกรรมซอฟต์แวร์) • ME201 (ช่างกลโรงงาน) • EE305 (ช่างไฟฟ้ากำลัง)
+            </p>
           </div>
 
-          {/* Select Course Switcher Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+          {/* Select Course Switcher Pills - 4 Core Courses Only */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-200/70 p-1.5 rounded-2xl border border-slate-200">
             <button
               id="branch-btn-ALL"
               key="ALL"
@@ -726,10 +657,10 @@ function ProfessorDashboardContent() {
               className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 selectedCourseCode === 'ALL'
                   ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                  : 'text-slate-700 hover:text-black bg-white/60'
+                  : 'text-slate-700 hover:text-black bg-white/70'
               }`}
             >
-              ทั้งหมด
+              ทั้งหมด (716 คน)
             </button>
             {professorCourses.map((c) => (
               <button
@@ -742,7 +673,7 @@ function ProfessorDashboardContent() {
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                   selectedCourseCode === c.code
                     ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
-                    : 'text-slate-700 hover:text-black bg-white/60'
+                    : 'text-slate-700 hover:text-black bg-white/70'
                 }`}
               >
                 {c.label}
@@ -767,7 +698,7 @@ function ProfessorDashboardContent() {
           </div>
         </div>
 
-        {/* Enrollment Table (Showing only Student ID & Name, No branch, No completion tags) */}
+        {/* Enrollment Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -775,23 +706,33 @@ function ProfessorDashboardContent() {
                 <th className="p-4 pl-6 w-16">#</th>
                 <th className="p-4 w-44">รหัสประจำตัว</th>
                 <th className="p-4">ชื่อนักศึกษา</th>
+                <th className="p-4 w-60">สาขาวิชาที่ลงเรียน</th>
               </tr>
             </thead>
             <tbody key={`table-body-${selectedCourseCode}`} className="divide-y divide-slate-100 animate-fadeIn">
               {currentStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">
+                  <td colSpan={4} className="p-8 text-center text-slate-500 font-medium">
                     {isLoading ? 'กำลังโหลดข้อมูลนักศึกษา...' : `ไม่พบบันทึกการลงเรียนในรายวิชาที่เลือก (${selectedCourseCode})`}
                   </td>
                 </tr>
               ) : (
-                displayedStudents.map((log, idx) => (
-                  <tr key={log.id || idx} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 pl-6 text-slate-400 font-mono text-xs">{idx + 1}</td>
-                    <td className="p-4 font-mono font-extrabold text-slate-900">{log.studentId}</td>
-                    <td className="p-4 font-bold text-slate-900">{log.name}</td>
-                  </tr>
-                ))
+                displayedStudents.map((log, idx) => {
+                  const cCode = log.courseCode || (log.studentId?.startsWith('XK-6501') ? 'CS101' : log.studentId?.startsWith('XK-6502') ? 'ME201' : log.studentId?.startsWith('XK-6503') ? 'EE305' : 'SE302');
+                  const cCat = log.category || (cCode === 'CS101' ? 'วิศวกรรมคอมพิวเตอร์' : cCode === 'ME201' ? 'ช่างกลโรงงาน' : cCode === 'EE305' ? 'ช่างไฟฟ้ากำลัง' : 'วิศวกรรมซอฟต์แวร์');
+                  return (
+                    <tr key={log.id || idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 pl-6 text-slate-400 font-mono text-xs">{idx + 1}</td>
+                      <td className="p-4 font-mono font-extrabold text-slate-900">{log.studentId}</td>
+                      <td className="p-4 font-bold text-slate-900">{log.name}</td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">
+                          {cCode} ({cCat})
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -884,7 +825,6 @@ function ProfessorDashboardContent() {
       </div>
 
 
-
       {/* Create Course Modal Popup (2-Step Wizard) */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -908,8 +848,13 @@ function ProfessorDashboardContent() {
                 variant="primary"
                 rightIcon={<ArrowRight className="w-4 h-4 text-black stroke-[2.5]" />}
                 className="rounded-xl bg-[#CEF34B] hover:bg-[#bce038] text-black text-xs font-extrabold shadow-md border-0 px-6 whitespace-nowrap"
-                disabled={!newCode.trim() || !newTitle.trim()}
-                onClick={() => setCreateStep(2)}
+                disabled={!newTitle.trim()}
+                onClick={() => {
+                  if (!newCode.trim()) {
+                    setNewCode(`XK-${Math.floor(100 + Math.random() * 900)}`);
+                  }
+                  setCreateStep(2);
+                }}
               >
                 ถัดไป
               </Button>
@@ -930,7 +875,7 @@ function ProfessorDashboardContent() {
                 isLoading={isSubmittingCourse}
                 onClick={handleCreateCourseSubmit}
               >
-                บันทึกสร้างรายวิชาและบทเรียน
+                ส่งขออนุมัติรายวิชา
               </Button>
             </>
           )
@@ -939,17 +884,16 @@ function ProfessorDashboardContent() {
         <form onSubmit={handleCreateCourseSubmit} className="space-y-4 text-xs font-sans">
           {createStep === 1 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-900 mb-1">
-                    รหัสวิชา (Course Code) <span className="text-rose-500">*</span>
+                    รหัสวิชา (Course Code)
                   </label>
                   <Input
-                    placeholder="ตัวอย่าง: CS103, EE401"
-                    required
+                    placeholder="ตัวอย่าง: TECH101 (เว้นว่างเพื่อสุ่มอัตโนมัติ)"
                     value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    className="rounded-xl text-xs bg-slate-50 border-slate-200"
+                    onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                    className="rounded-xl text-xs bg-slate-50 border-slate-200 uppercase font-mono font-bold"
                   />
                 </div>
                 <div>
@@ -966,24 +910,6 @@ function ProfessorDashboardContent() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-900 mb-1">
-                  หมวดหมู่รายวิชา (ทุกสาขาวิชาเรียนได้)
-                </label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-slate-900"
-                >
-                  <option value="ทั่วไป (เปิดกว้างทุกสาขาวิชา)">ทั่วไป (เปิดกว้างทุกสาขาวิชาเรียนได้)</option>
-                  <option value="วิชาแกนวิศวกรรม/ช่างอุตสาหกรรม">วิชาแกนวิศวกรรม/ช่างอุตสาหกรรม (เปิดทุกสาขา)</option>
-                  <option value="วิชาเลือกเสรี">วิชาเลือกเสรี (เปิดทุกสาขา)</option>
-                  <option value="วิชาปฏิบัติการและโครงงาน">วิชาปฏิบัติการและโครงงาน (เปิดทุกสาขา)</option>
-                </select>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  * ทุกรายวิชาเปิดกว้างให้นักศึกษาทุกสาขาวิชาเข้าเรียนได้ หรือยื่นขออนุมัติได้โดยไม่มีการจำกัดเฉพาะสาขา
-                </p>
-              </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-900 mb-1">

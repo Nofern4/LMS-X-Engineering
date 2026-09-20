@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, Search, GraduationCap, BookOpen, Wrench, ShieldCheck, 
-  Eye, UserCheck, LogOut, Plus, ChevronDown, 
+  Eye, UserCheck, LogOut, Plus, ChevronDown, Video,
   ArrowRight, User, ShieldAlert, ArrowRightLeft, Check
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
@@ -188,7 +188,6 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
     ) {
       return [
         { label: translate('ศูนย์อนุมัติ', currentLang), href: '/course-approver', icon: <ShieldCheck className="w-4 h-4" /> },
-        { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
       ];
     }
 
@@ -197,8 +196,7 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
       effectiveRole === 'REGISTRAR'
     ) {
       return [
-        { label: translate('ศูนย์สิทธิ์นายทะเบียน', currentLang), href: '/registrar/users', icon: <UserCheck className="w-4 h-4" /> },
-        { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
+        { label: 'ทะเบียน', href: '/registrar/users', icon: <UserCheck className="w-4 h-4" /> },
       ];
     }
 
@@ -210,13 +208,13 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
         ];
       case 'PROFESSOR':
         return [
-          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
+          { label: 'แดชบอร์ดอาจารย์', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
+          { label: 'คลาสที่เปิดสอน', href: '/professor/classes', icon: <Video className="w-4 h-4" /> },
         ];
       case 'DIRECTOR':
         return [
           { label: translate('แดชบอร์ดบริหาร', currentLang), href: '/director', icon: <Eye className="w-4 h-4" /> },
           { label: translate('ภาพรวมรายวิชา', currentLang), href: '/courses', icon: <BookOpen className="w-4 h-4" /> },
-          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
         ];
       default:
         return [
@@ -283,7 +281,6 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
               >
                 <option value="course">ค้นหารายวิชา</option>
                 <option value="instructor">ค้นหาชื่ออาจารย์</option>
-                <option value="code">ค้นหารหัสวิชา</option>
               </select>
               <div className="relative flex-1 flex items-center">
                 <input
@@ -293,8 +290,6 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
                   placeholder={
                     headerSearchType === 'instructor'
                       ? 'ค้นหาชื่ออาจารย์...'
-                      : headerSearchType === 'code'
-                      ? 'ค้นหารหัสวิชา (ตัวเลข เช่น 101, 302)...'
                       : 'ค้นหารายวิชา...'
                   }
                   className="w-full pl-2.5 pr-8 py-1.5 text-xs bg-transparent focus:outline-none text-slate-900 font-medium placeholder:text-slate-400"
@@ -335,7 +330,7 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
               <div 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-full transition-all select-none"
-                title="คลิกเพื่อดูโปรไฟล์และสลับบทบาท"
+                title="คลิกเพื่อดูโปรไฟล์"
               >
                 <Badge variant={getRoleBadgeVariant(effectiveRole)} size="sm" className="font-extrabold text-[10px] px-2 py-0.5 rounded-full flex-shrink-0">
                   {translate(getRoleThaiTitle(effectiveRole), currentLang)}
@@ -396,7 +391,7 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
                   </div>
                 </div>
 
-                {/* Section: บทบาทที่ได้รับอนุญาต */}
+                {/* Section: บทบาทที่ได้รับอนุญาต — กดเพื่อสลับ role ได้เลย */}
                 <div className="px-1 space-y-1.5">
                   <span className="text-[11px] font-semibold text-slate-500 block">
                     {translate('บทบาทที่ได้รับมอบหมาย', currentLang)}
@@ -406,108 +401,42 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
                       const isActive = (r === 'COURSE_CREATOR_APPROVER' || r === 'APPROVER') ? isApproverLayer :
                                        r === 'STUDENT' ? isStudentLayer :
                                        r === 'PROFESSOR' ? isProfessorLayer :
+                                       r === 'DIRECTOR' ? isDirectorLayer :
+                                       r === 'REGISTRAR' ? isRegistrarLayer :
                                        r === effectiveRole;
+
+                      const getRoleHref = (roleName: string) => {
+                        if (roleName === 'PROFESSOR') return '/professor';
+                        if (roleName === 'STUDENT') return '/student';
+                        if (roleName === 'DIRECTOR') return '/director';
+                        if (roleName === 'REGISTRAR') return '/registrar/users';
+                        if (roleName === 'COURSE_CREATOR_APPROVER' || roleName === 'APPROVER') return '/course-approver';
+                        return '/student';
+                      };
+
                       return (
-                        <span 
-                          key={r} 
-                          className={`text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 transition-all ${
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => {
+                            if (!isActive) {
+                              setIsDropdownOpen(false);
+                              router.push(getRoleHref(r));
+                            }
+                          }}
+                          title={isActive ? `กำลังใช้งาน: ${getRoleThaiTitle(r)}` : `สลับไป: ${getRoleThaiTitle(r)}`}
+                          className={`text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 transition-all border ${
                             isActive
-                              ? 'bg-slate-900 text-white shadow-xs'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              ? 'bg-slate-900 text-white shadow-xs border-slate-900 cursor-default'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-800 hover:text-white hover:border-slate-800 cursor-pointer active:scale-95'
                           }`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#CEF34B]' : 'bg-slate-400'}`} />
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-[#CEF34B]' : 'bg-slate-400'}`} />
                           <span>{translate(getRoleThaiTitle(r), currentLang)}</span>
-                        </span>
+                        </button>
                       );
                     })}
                   </div>
-                </div>
-
-                {/* Section: สลับโหมดการทำงาน */}
-                <div className="space-y-2 pt-1 border-t border-slate-100">
-                  
-                  {/* Switch to Approver Tile */}
-                  {hasApproverRole && !isApproverLayer && (
-                    <div
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        router.push('/course-approver');
-                      }}
-                      className="group p-3 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white cursor-pointer hover:from-black hover:to-slate-900 transition-all shadow-sm flex items-center justify-between border border-slate-700"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center flex-shrink-0">
-                          <ShieldCheck className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white group-hover:text-[#CEF34B] transition-colors">
-                            {translate('สลับไปโหมดผู้อนุมัติ', currentLang)}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {translate('ตรวจสอบและอนุมัติหลักสูตร', currentLang)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="w-6 h-6 rounded-full bg-white/10 group-hover:bg-[#CEF34B] group-hover:text-black flex items-center justify-center transition-colors">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Switch to Student Tile */}
-                  {isApproverLayer && hasStudentRole && (
-                    <div
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        router.push('/student');
-                      }}
-                      className="group p-3 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white cursor-pointer hover:from-black hover:to-slate-900 transition-all shadow-sm flex items-center justify-between border border-slate-700"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-[#CEF34B]/20 border border-[#CEF34B]/40 text-[#CEF34B] flex items-center justify-center flex-shrink-0">
-                          <GraduationCap className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white group-hover:text-[#CEF34B] transition-colors">
-                            {translate('สลับกลับสู่โหมดนักศึกษา', currentLang)}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {translate('เข้าสู่หน้าเรียนและรายวิชา', currentLang)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="w-6 h-6 rounded-full bg-white/10 group-hover:bg-[#CEF34B] group-hover:text-black flex items-center justify-center transition-colors">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Switch to Professor Tile */}
-                  {hasProfessorRole && !isProfessorLayer && (
-                    <div
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        router.push('/professor');
-                      }}
-                      className="group p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-900 cursor-pointer transition-all border border-slate-200 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
-                          <BookOpen className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">
-                            {translate('สลับไประบบจัดการการสอน', currentLang)}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            {translate('จัดการคอร์สเรียนและบทเรียน', currentLang)}
-                          </div>
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-800 transition-colors" />
-                    </div>
-                  )}
                 </div>
 
                 {/* Dropdown Action Links */}

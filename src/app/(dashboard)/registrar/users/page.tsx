@@ -325,8 +325,7 @@ function RegistrarUsersContent() {
     <div className="space-y-6 animate-fadeIn font-sans text-slate-900 pb-16">
       
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/registrar')}
             className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-xs"
@@ -336,27 +335,10 @@ function RegistrarUsersContent() {
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2">
               <UserCheck className="w-6 h-6 text-black" />
-              <span>ศูนย์มอบสิทธิ์หลายบทบาท (Multi-Role Assignment Center)</span>
+              <span>ลงทะเบียน</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              สำหรับนายทะเบียน: สามารถเลือกมอบหลายบทบาทให้ผู้ใช้งานถือครองสิทธิ์พร้อมกันได้ (เช่น อาจารย์ถือสิทธิ์ PROFESSOR + STUDENT)
-            </p>
           </div>
         </div>
-
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => {
-            setIsAddModalOpen(true);
-            setModalError(null);
-          }}
-          className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold rounded-xl text-xs sm:text-sm shadow-sm"
-          leftIcon={<UserPlus className="w-4 h-4 text-black" />}
-        >
-          เพิ่มบุคลากร / ครูใหม่
-        </Button>
-      </div>
 
       {/* Role Requests Notification Feedback */}
       {requestFeedback && (
@@ -373,39 +355,44 @@ function RegistrarUsersContent() {
         </div>
       )}
 
-      {/* Section: Role Permission Requests Queue (คำขอสิทธิ์จากนักเรียนและบุคลากร) */}
-      {roleRequests.filter((r) => r.status === 'PENDING').length > 0 && (
-        <Card className="border-amber-300 bg-amber-50/50 shadow-md overflow-hidden animate-fadeIn">
-          <CardHeader className="bg-amber-100/70 border-b border-amber-200 p-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
-                <Shield className="w-5 h-5" />
-              </span>
-              <div>
-                <h2 className="text-sm sm:text-base font-black text-amber-950">
-                  กล่องคำขอรับสิทธิ์ / ขอยกเลิกสิทธิ์ (รอนายทะเบียนพิจารณา)
-                </h2>
-                <p className="text-xs text-amber-800 font-medium">
-                  มีผู้ใช้งานยื่นคำขอสิทธิ์ผ่านเมนู Header จำนวน{' '}
-                  <span className="font-extrabold text-amber-950 underline">
-                    {roleRequests.filter((r) => r.status === 'PENDING').length} รายการ
-                  </span>
-                </p>
-              </div>
+      {/* Section: Role Permission Requests Queue — always visible at top */}
+      <Card className="border-amber-300 bg-amber-50/50 shadow-md overflow-hidden animate-fadeIn">
+        <CardHeader className="bg-amber-100/70 border-b border-amber-200 p-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+              <Shield className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-amber-950">
+                กล่องคำขอสิทธิ์
+              </h2>
+              <p className="text-xs text-amber-800 font-medium">
+                {roleRequests.filter((r) => r.status === 'PENDING').length > 0 ? (
+                  <>มีคำขอรอดำเนินการ{' '}
+                    <span className="font-extrabold text-amber-950 underline">
+                      {roleRequests.filter((r) => r.status === 'PENDING').length} รายการ
+                    </span>
+                  </>
+                ) : 'ไม่มีคำขอไว้รอดำเนินการ'}
+              </p>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={fetchRoleRequests}
-              className="text-xs font-bold bg-white text-slate-800 border-amber-300"
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-            >
-              รีเฟรชคำขอ
-            </Button>
-          </CardHeader>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={fetchRoleRequests}
+            className="text-xs font-bold bg-white text-slate-800 border-amber-300"
+            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+          >
+            รีเฟรช
+          </Button>
+        </CardHeader>
 
-          <div className="divide-y divide-amber-200/60 p-2 sm:p-4 space-y-3">
-            {roleRequests
+        <div className="divide-y divide-amber-200/60 p-2 sm:p-4 space-y-3">
+          {roleRequests.filter((r) => r.status === 'PENDING').length === 0 ? (
+            <p className="text-center text-xs text-amber-700 py-4">ไม่มีคำขอสิทธิ์ใหม่ในขณะนี้</p>
+          ) : (
+            roleRequests
               .filter((r) => r.status === 'PENDING')
               .map((req) => (
                 <div
@@ -428,25 +415,19 @@ function RegistrarUsersContent() {
                         {req.requestType === 'GRANT' ? '➕ ขอรับสิทธิ์ใหม่' : '➖ ขอยกเลิกสิทธิ์'}
                       </Badge>
                     </div>
-
                     <div className="text-xs text-slate-700 flex flex-wrap items-center gap-2">
                       <span>ต้องการ:</span>
                       <span className="font-extrabold text-slate-900 bg-amber-100/70 border border-amber-300 px-2.5 py-0.5 rounded-full">
                         {req.roleName === 'COURSE_CREATOR_APPROVER' ? 'คนอนุมัติ (APPROVER)' : req.roleName}
                       </span>
                       {req.reason && (
-                        <span className="text-slate-600 italic">
-                          — เหตุผล: "{req.reason}"
-                        </span>
+                        <span className="text-slate-600 italic">— เหตุผล: "{req.reason}"</span>
                       )}
                     </div>
-
                     <div className="text-[10px] text-slate-400">
                       ยื่นคำขอเมื่อ: {new Date(req.createdAt).toLocaleString('th-TH')}
                     </div>
                   </div>
-
-                  {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
                       variant="primary"
@@ -456,9 +437,8 @@ function RegistrarUsersContent() {
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs"
                       leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
                     >
-                      อนุมัติคำขอนี้
+                      อนุมัติ
                     </Button>
-
                     <Button
                       variant="danger"
                       size="sm"
@@ -471,10 +451,10 @@ function RegistrarUsersContent() {
                     </Button>
                   </div>
                 </div>
-              ))}
-          </div>
-        </Card>
-      )}
+              ))
+          )}
+        </div>
+      </Card>
 
       {/* Role Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">

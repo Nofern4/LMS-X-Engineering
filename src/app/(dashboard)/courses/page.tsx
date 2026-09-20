@@ -119,14 +119,8 @@ export default function GlobalCoursesCatalogPage() {
   };
 
   const getPlaceholder = () => {
-    switch (searchType) {
-      case 'instructor':
-        return 'ค้นหาชื่ออาจารย์ผู้สอน...';
-      case 'code':
-        return 'ค้นหารหัสวิชา (ตัวเลข เช่น 101, 302)...';
-      default:
-        return 'ค้นหาชื่อรายวิชา...';
-    }
+    if (searchType === 'instructor') return 'ค้นหาชื่ออาจารย์ผู้สอน...';
+    return 'ค้นหาชื่อรายวิชา...';
   };
 
   const displayCourses = courses.filter((c) => {
@@ -172,7 +166,6 @@ export default function GlobalCoursesCatalogPage() {
               >
                 <option value="course">ค้นหารายวิชา</option>
                 <option value="instructor">ค้นหาชื่ออาจารย์</option>
-                <option value="code">ค้นหารหัสวิชา</option>
               </select>
             </div>
 

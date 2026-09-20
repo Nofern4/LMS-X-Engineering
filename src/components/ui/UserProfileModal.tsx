@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, Camera, User, GraduationCap, BookOpen, Building, Mail, 
-  ShieldCheck, ArrowRightLeft, Sparkles, CheckCircle2 
+  X, Camera, User, GraduationCap, BookOpen, Building, Mail 
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -97,25 +96,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const hasApproverRole = userRoles.includes('COURSE_CREATOR_APPROVER') || userRoles.includes('APPROVER');
-  const hasProfessorRole = userRoles.includes('PROFESSOR');
-  const hasStudentRole = userRoles.includes('STUDENT');
-  const hasRegistrarRole = userRoles.includes('REGISTRAR');
-  const hasDirectorRole = userRoles.includes('DIRECTOR');
-
-  const isCurrentlyInApprover = pathname?.startsWith('/course-approver') || pathname?.startsWith('/content-approver');
-  const isCurrentlyInStudent = pathname?.startsWith('/student');
-
-  const handleSwitchToApprover = () => {
-    onClose();
-    router.push('/course-approver');
-  };
-
-  const handleSwitchToStudent = () => {
-    onClose();
-    router.push('/student');
-  };
-
   const cleanName = (userName || '').replace(/\s*\([A-Za-z0-9\s\.\-]+\)/g, '').trim();
 
   return (
@@ -127,7 +107,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-[#CEF34B]" />
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              ข้อมูลโปรไฟล์ & สลับบทบาท
+              ข้อมูลโปรไฟล์
             </h2>
           </div>
           <button
@@ -267,102 +247,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           </div>
 
-          {/* Section: บทบาทที่ได้รับมอบหมาย & สลับบทบาท */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 space-y-3.5 shadow-lg">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#CEF34B]" />
-                <span className="text-xs font-black uppercase tracking-wider text-slate-200">
-                  บทบาทที่ได้รับมอบหมาย
-                </span>
-              </div>
-              {onOpenRoleRequest && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenRoleRequest();
-                  }}
-                  className="text-[11px] font-bold text-[#CEF34B] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>ขอสิทธิ์</span>
-                </button>
-              )}
-            </div>
-
-            {/* Badges of all assigned roles */}
-            <div className="flex flex-wrap gap-2">
-              {userRoles.map((r) => {
-                const isActive = (r === 'COURSE_CREATOR_APPROVER' || r === 'APPROVER') ? isCurrentlyInApprover :
-                                 r === 'STUDENT' ? isCurrentlyInStudent :
-                                 r === role;
-                return (
-                  <span
-                    key={r}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border transition-all ${
-                      isActive
-                        ? 'bg-[#CEF34B] text-black border-[#CEF34B] shadow-xs'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700'
-                    }`}
-                  >
-                    {isActive && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    <span>{r}</span>
-                    {isActive && <span className="text-[10px] font-bold text-slate-800">(ใช้งานอยู่)</span>}
-                  </span>
-                );
-              })}
-            </div>
-
-            {/* One-Click Role Switch Action Buttons */}
-            <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-slate-400">
-                สลับโหมดการทำงานได้ทันที โดยใช้บัญชีและรหัสเดิม ไม่ต้องเข้าสู่ระบบใหม่
-              </p>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* ถ้ามี role อนุมัติ และไม่ได้อยู่ในหน้าอนุมัติ -> แสดงปุ่มสลับไปหน้าคนอนุมัติ */}
-                {hasApproverRole && !isCurrentlyInApprover && (
-                  <button
-                    type="button"
-                    onClick={handleSwitchToApprover}
-                    className="px-4 py-2 rounded-full bg-[#CEF34B] hover:bg-[#bde53d] text-black text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                  >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>สลับไปโหมดผู้อนุมัติ</span>
-                  </button>
-                )}
-
-                {/* ถ้าอยู่ในหน้าอนุมัติ และมี role นักเรียน -> แสดงปุ่มสลับกลับมาหน้านักเรียน */}
-                {isCurrentlyInApprover && hasStudentRole && (
-                  <button
-                    type="button"
-                    onClick={handleSwitchToStudent}
-                    className="px-4 py-2 rounded-full bg-[#CEF34B] hover:bg-[#bde53d] text-black text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                  >
-                    <GraduationCap className="w-4 h-4" />
-                    <span>สลับกลับสู่โหมดนักศึกษา</span>
-                  </button>
-                )}
-
-                {/* หากมีบทบาทอาจารย์ และไม่ได้อยู่ในหน้าจัดการการสอน */}
-                {hasProfessorRole && !pathname?.startsWith('/professor') && (
-                  <button
-                    type="button"
-                    onClick={() => { onClose(); router.push('/professor'); }}
-                    className="px-4 py-2 rounded-full bg-slate-900 hover:bg-black text-[#CEF34B] text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 border border-slate-700"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>สลับไประบบจัดการการสอน</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-          </div>
-
           {/* Close Button */}
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end pt-2">
             <button
               type="button"
               onClick={onClose}

@@ -43,21 +43,30 @@ export default function DirectorDashboard() {
     storageUsedGb: '7.21',
   };
 
-  const chartMaterialsData = data?.courseMaterialStats || [
-    { code: 'CS101', title: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', materials: 12 },
-    { code: 'ME201', title: 'กลศาสตร์เครื่องกลและการออกแบบระบบอัตโนมัติ', materials: 8 },
-    { code: 'EE305', title: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', materials: 3 },
-    { code: 'AUTO101', title: 'เทคโนโลยีช่างยนต์และยานยนต์ไฟฟ้า EV', materials: 3 },
-    { code: 'SE302', title: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', materials: 2 },
-    { code: 'AI401', title: 'ปัญญาประดิษฐ์และการเรียนรู้ของเครื่อง', materials: 0 },
-  ];
+  const coursesList = data?.courses || [];
+
+  // Build chart data from the SAME coursesList used in the table below — data always matches
+  const chartMaterialsData = coursesList.length > 0
+    ? coursesList.map((c: any) => ({
+        code: c.code,
+        title: c.title,
+        materials: c._count?.materials ?? 0,
+        enrollments: c._count?.enrollments ?? 0,
+      }))
+    : [
+        { code: 'CS101', title: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', materials: 3, enrollments: 245 },
+        { code: 'ME201', title: 'กลศาสตร์เครื่องกลและการออกแบบระบบอัตโนมัติ', materials: 0, enrollments: 182 },
+        { code: 'EE305', title: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', materials: 2, enrollments: 164 },
+        { code: 'AUTO101', title: 'เทคโนโลยีช่างยนต์และยานยนต์ไฟฟ้า EV', materials: 2, enrollments: 138 },
+        { code: 'SE302', title: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', materials: 2, enrollments: 125 },
+        { code: 'AI401', title: 'ปัญญาประดิษฐ์และการเรียนรู้ของเครื่อง', materials: 0, enrollments: 0 },
+      ];
 
   const courseStatusPieData = [
     { name: 'อนุมัติเปิดสอนแล้ว', value: overview.publishedCourses, color: '#CEF34B' },
     { name: 'รอการพิจารณาอนุมัติ', value: overview.pendingCourses, color: '#0f172a' },
   ];
 
-  const coursesList = data?.courses || [];
 
   const cleanTitle = (title: string) => {
     if (!title) return '';
@@ -245,34 +254,50 @@ export default function DirectorDashboard() {
 
       {/* 4. Crystal-Clear Analytics Charts (Legible, Single-Metric) */}
       <div id="reports" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Chart: Materials count per course */}
+        {/* Left Chart: Materials + Enrollments per course — same data as table below */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden p-6 space-y-4">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-slate-900" />
-                <span>สถิติจำนวนสื่อการเรียนรู้แยกตามรายวิชา (รายการ)</span>
+                <span>สถิติเปรียบเทียบสื่อการสอนและผู้เรียนในแต่ละรายวิชา</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                ความพร้อมของสื่อ วิดีโอ และเอกสารประกอบการสอนในแต่ละรายวิชาที่เปิดในระบบ
+                ข้อมูลตรงกับตารางด้านล่าง — ดึงจากฐานข้อมูลเดียวกันทุกอัน
               </p>
+            </div>
+            {/* Legend */}
+            <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-slate-900" />
+                <span>สื่อการสอน</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-[#CEF34B]" style={{border:'1px solid #94a3b8'}} />
+                <span>นักศึกษาที่ลงทะเบียน</span>
+              </div>
             </div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartMaterialsData} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
+              <BarChart data={chartMaterialsData} margin={{ top: 10, right: 20, left: -10, bottom: 20 }} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="code" tick={{ fontSize: 12, fill: '#0f172a', fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
                 <Tooltip
-                  formatter={(value: any) => [`${value} รายการ`, 'จำนวนสื่อการสอน']}
+                  formatter={(value: any, name: any) => [
+                    name === 'สื่อการสอน' ? `${value} รายการ` : `${value} คน`,
+                    name,
+                  ]}
                   labelFormatter={(label: any) => {
                     const item = chartMaterialsData.find((d: any) => d.code === label);
-                    return item ? `${item.code}: ${item.title}` : label;
+                    return item ? `${item.code}` : label;
                   }}
                   contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
                 />
-                <Bar dataKey="materials" fill="#0f172a" radius={[8, 8, 0, 0]} name="จำนวนสื่อการสอน (รายการ)" />
+                <Bar yAxisId="left" dataKey="materials" fill="#0f172a" radius={[6, 6, 0, 0]} name="สื่อการสอน" maxBarSize={40} />
+                <Bar yAxisId="right" dataKey="enrollments" fill="#CEF34B" radius={[6, 6, 0, 0]} name="นักศึกษาที่ลงทะเบียน" stroke="#94a3b8" strokeWidth={0.5} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

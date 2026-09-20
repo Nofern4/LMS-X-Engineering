@@ -368,16 +368,11 @@ export default function StudentDashboard() {
 
       {/* 4. Student Enrolled Courses Table */}
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-3">
-        <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2.5">
-              <BookOpen className="w-5 h-5 text-black" />
-              <span>รายวิชาที่เข้าเรียน</span>
-            </h3>
-          </div>
-          <span className="px-4 py-1.5 rounded-full bg-black text-[#CEF34B] font-extrabold text-xs sm:text-sm self-start sm:self-auto">
-            รวม {enrolledCourses.length} วิชา
-          </span>
+        <div className="p-6 bg-slate-50 border-b border-slate-200">
+          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2.5">
+            <BookOpen className="w-5 h-5 text-black" />
+            <span>รายวิชาที่เข้าเรียน</span>
+          </h3>
         </div>
 
         <div className="overflow-x-auto">

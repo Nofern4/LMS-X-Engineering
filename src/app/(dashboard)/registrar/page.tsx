@@ -33,7 +33,7 @@ export default function RegistrarDashboard() {
       <div className="p-6 sm:p-8 bg-black text-white rounded-3xl border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="relative z-10">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            ระบบจัดการสิทธิ์และทะเบียน
+            ระบบจัดการสิทธิ์
           </h1>
         </div>
 
