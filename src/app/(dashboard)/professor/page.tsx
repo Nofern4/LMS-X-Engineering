@@ -90,123 +90,84 @@ export default function ProfessorDashboard() {
     }
   }, [searchParams]);
 
-  // Mock student course enrollment & program completion status
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([
-    {
-      id: 'att-1',
-      studentId: 'XK-65010042',
-      name: 'สมชาย ช่างกล',
-      department: 'ช่างกลโรงงาน & วิศวกรรมคอมพิวเตอร์',
-      courseCode: 'CS101',
-      enrolledDate: '16 ก.ย. 2026, 09:30 น.',
-      progress: 100,
-      status: 'COMPLETED',
-      topic: 'วิชาบังคับสาขา • เรียนจบโปรแกรมคอร์สแล้ว',
-    },
-    {
-      id: 'att-2',
-      studentId: 'XK-65010088',
-      name: 'สมศักดิ์ ไฟฟ้า',
-      department: 'ช่างไฟฟ้ากำลัง',
-      courseCode: 'CS101',
-      enrolledDate: '15 ก.ย. 2026, 14:15 น.',
-      progress: 50,
-      status: 'IN_PROGRESS',
-      topic: 'บทที่ 1: แนะนำวิชา และการติดตั้งเครื่องมือพัฒนา',
-    },
-    {
-      id: 'att-3',
-      studentId: 'XK-65010112',
-      name: 'อนันต์ เครื่องกล',
-      department: 'วิศวกรรมเครื่องกล Xการช่าง',
-      courseCode: 'CS101',
-      enrolledDate: '14 ก.ย. 2026, 11:00 น.',
-      progress: 75,
-      status: 'IN_PROGRESS',
-      topic: 'บทที่ 2: โครงสร้างไฟล์และสถาปัตยกรรมระบบ',
-    },
-    {
-      id: 'att-4',
-      studentId: 'XK-65010204',
-      name: 'กิตติพงษ์ ยานยนต์',
-      department: 'เทคโนโลยีช่างยนต์',
-      courseCode: 'ME201',
-      enrolledDate: '12 ก.ย. 2026, 10:20 น.',
-      progress: 100,
-      status: 'COMPLETED',
-      topic: 'บทที่ 2: ระบบไฮดรอลิกในงานอุตสาหกรรม',
-    },
-    {
-      id: 'att-5',
-      studentId: 'XK-65010310',
-      name: 'ณัฐวุฒิ การช่าง',
-      department: 'ช่างไฟฟ้ากำลัง',
-      courseCode: 'ME201',
-      enrolledDate: '10 ก.ย. 2026, 16:45 น.',
-      progress: 25,
-      status: 'IN_PROGRESS',
-      topic: 'บทที่ 1: ปูพื้นฐานระบบไฟฟ้ารวม',
-    },
-    {
-      id: 'att-6',
-      studentId: 'XK-65010420',
-      name: 'วิชัย ไฟฟ้า',
-      department: 'ช่างไฟฟ้ากำลัง',
-      courseCode: 'EE305',
-      enrolledDate: '11 ก.ย. 2026, 13:10 น.',
-      progress: 60,
-      status: 'IN_PROGRESS',
-      topic: 'บทที่ 1: ระบบควบคุม PLC และ IoT',
-    }
-  ]);
-
-  // Mock course interest metrics (คลาสไหนที่นักเรียนสนใจ)
-  const courseInterestData = [
-    {
-      code: 'CS101',
-      title: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน',
-      category: 'วิศวกรรมคอมพิวเตอร์',
-      interestScore: 98,
-      viewsCount: 24500,
-      enrolledCount: 142,
-      topMaterial: 'วิดีโอปฏิบัติการที่ 1: ติดตั้งสภาพแวดล้อมระบบ (ดูซ้ำ 1,420 ครั้ง)',
-      trend: '+24% สัปดาห์นี้',
-    },
-    {
-      code: 'ME201',
-      title: 'กลศาสตร์เครื่องกลและการออกแบบระบบอัตโนมัติ',
-      category: 'ช่างกลโรงงาน',
-      interestScore: 92,
-      viewsCount: 18200,
-      enrolledCount: 98,
-      topMaterial: 'คู่มือความปลอดภัยประจำห้องปฏิบัติการ (ดูซ้ำ 980 ครั้ง)',
-      trend: '+18% สัปดาห์นี้',
-    },
-    {
-      code: 'EE305',
-      title: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT',
-      category: 'ช่างไฟฟ้ากำลัง',
-      interestScore: 85,
-      viewsCount: 11900,
-      enrolledCount: 76,
-      topMaterial: 'การเขียนโปรแกรม PLC ควบคุมวงจรไฟฟ้า (ดูซ้ำ 650 ครั้ง)',
-      trend: '+12% สัปดาห์นี้',
-    },
-  ];
+  // Student course enrollment & program completion status
+  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
 
   useEffect(() => {
     fetch('/api/courses')
       .then((res) => res.json())
-      .then((data) => {
-        setCourses(data.courses || []);
-        if (data.courses?.[0]?.id) {
-          fetch(`/api/courses/${data.courses[0].id}/students`)
-            .then((r) => r.json())
-            .then((ed) => setEnrollments(ed.enrollments || []));
+      .then(async (data) => {
+        const cList = data.courses || [];
+        setCourses(cList);
+
+        // Fetch students for all courses
+        const allEnrolls: any[] = [];
+        const allPendingEnrolls: any[] = [];
+
+        for (const c of cList) {
+          try {
+            const r = await fetch(`/api/courses/${c.id}/students`);
+            const ed = await r.json();
+            if (ed.enrollments) {
+              ed.enrollments.forEach((en: any) => {
+                allEnrolls.push({
+                  id: en.id,
+                  studentId: en.student?.studentId || 'XK-65010042',
+                  name: en.student?.name || 'นักศึกษา',
+                  department: en.student?.department || c.category,
+                  courseCode: c.code,
+                  enrolledDate: new Date(en.requestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
+                  progress: en.status === 'APPROVED' ? 100 : 25,
+                  status: en.status === 'APPROVED' ? 'COMPLETED' : 'IN_PROGRESS',
+                  topic: en.status === 'APPROVED' ? `${c.title} • ได้รับการอนุมัติแล้ว` : `${c.title} • รอการอนุมัติสิทธิ์`,
+                });
+
+                // เก็บคำขอทั้งหมดเพื่อแสดงในตารางคำขอ
+                allPendingEnrolls.push({
+                  ...en,
+                  courseId: c.id,
+                  courseCode: c.code,
+                  courseTitle: c.title,
+                });
+              });
+            }
+          } catch (e) {}
         }
+        setAttendanceLogs(allEnrolls);
+        setEnrollments(allPendingEnrolls);
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  const reloadEnrollments = async () => {
+    const res = await fetch('/api/courses');
+    const data = await res.json();
+    const cList = data.courses || [];
+    const allPendingEnrolls: any[] = [];
+    for (const c of cList) {
+      try {
+        const r = await fetch(`/api/courses/${c.id}/students`);
+        const ed = await r.json();
+        if (ed.enrollments) {
+          ed.enrollments.forEach((en: any) => {
+            allPendingEnrolls.push({ ...en, courseId: c.id, courseCode: c.code, courseTitle: c.title });
+          });
+        }
+      } catch (e) {}
+    }
+    setEnrollments(allPendingEnrolls);
+  };
+
+  const courseInterestData = courses.slice(0, 3).map((c, idx) => ({
+    code: c.code,
+    title: c.title,
+    category: c.category,
+    interestScore: 95 - (idx * 5),
+    viewsCount: (c._count?.materials ?? 0) * 120 + (c._count?.enrollments ?? 0) * 80,
+    enrolledCount: c._count?.enrollments ?? 0,
+    topMaterial: `${c.title} (${c._count?.materials ?? 0} บทเรียน)`,
+    trend: c._count?.enrollments > 0 ? `+${c._count.enrollments} คนเรียน` : 'เปิดให้ลงทะเบียน',
+  }));
 
   const handleApproveStudent = async (courseId: string, studentId: string) => {
     await fetch(`/api/courses/${courseId}/students`, {
@@ -218,9 +179,7 @@ export default function ProfessorDashboard() {
         action: 'APPROVE',
       }),
     });
-    setEnrollments((prev) =>
-      prev.map((e) => (e.studentId === studentId ? { ...e, status: 'APPROVED' } : e))
-    );
+    await reloadEnrollments();
   };
 
   const handleRejectStudent = async (courseId: string, studentId: string) => {
@@ -233,9 +192,7 @@ export default function ProfessorDashboard() {
         action: 'REJECT',
       }),
     });
-    setEnrollments((prev) =>
-      prev.map((e) => (e.studentId === studentId ? { ...e, status: 'REJECTED' } : e))
-    );
+    await reloadEnrollments();
   };
 
   const handleCreateCourseSubmit = async (e: React.FormEvent) => {
@@ -582,11 +539,21 @@ export default function ProfessorDashboard() {
                   <tr key={e.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 pl-6 font-mono font-extrabold text-slate-900">{e.student?.studentId || 'XK-65010088'}</td>
                     <td className="p-4 font-bold text-slate-900">{e.student?.name || 'สมศักดิ์ ไฟฟ้า'}</td>
-                    <td className="p-4 text-slate-600">{e.student?.email || 'student2@student.x-karchang.ac.th'}</td>
+                    <td className="p-4 text-slate-600">
+                      {e.student?.email || 'student2@student.x-karchang.ac.th'}
+                      {e.courseCode && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">{e.courseCode}</span>
+                      )}
+                    </td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full font-extrabold text-xs ${e.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : e.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                        }`}>
-                        {e.status}
+                      <span className={`px-3 py-1 rounded-full font-extrabold text-xs ${
+                        e.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : e.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {e.status === 'APPROVED' ? '✅ อนุมัติแล้ว'
+                          : e.status === 'REJECTED' ? '❌ ปฏิเสธแล้ว'
+                          : '⏳ รออนุมัติ'}
                       </span>
                     </td>
                     <td className="p-4 pr-6 text-right space-x-2">
@@ -608,9 +575,12 @@ export default function ProfessorDashboard() {
                             className="border-rose-200 text-rose-700 hover:bg-rose-50 rounded-full text-xs font-extrabold px-4 py-2"
                             leftIcon={<XCircle className="w-3.5 h-3.5 text-rose-600" />}
                           >
-                            ปฏิเสธ
+                            ไม่อนุมัติ
                           </Button>
                         </>
+                      )}
+                      {e.status === 'REJECTED' && (
+                        <span className="text-xs text-rose-500 font-semibold">นักเรียนสามารถยื่นคำขอใหม่ได้</span>
                       )}
                     </td>
                   </tr>

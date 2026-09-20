@@ -27,42 +27,8 @@ export default function CourseApproverDashboard() {
       .then((r) => r.json())
       .then((d) => {
         const pending = (d.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
-        setCourses(pending.length > 0 ? pending : [
-          {
-            id: 'demo-pending-1',
-            code: 'AI401',
-            title: 'ปัญญาประดิษฐ์และการเรียนรู้ของเครื่อง (AI & Machine Learning)',
-            description: 'โครงสร้างวิชาใหม่ที่ขออนุมัติเปิดสอนสำหรับสาขาวิทยาการข้อมูลและวิศวกรรมคอมพิวเตอร์ มหาวิทยาลัย Xการช่าง',
-            category: 'วิทยาการข้อมูล',
-            semester: '1',
-            academicYear: '2026',
-            status: 'PENDING_APPROVAL',
-            createdBy: { name: 'ผศ.ดร.วิชาญ สอนดี', email: 'professor@x-karchang.ac.th' },
-          }
-        ]);
+        setCourses(pending);
       });
-
-    // Seed mock materials waiting approval
-    setMaterials([
-      {
-        id: 'mat-pending-1',
-        title: 'วิดีโอสาธิตการเชื่อมวงจรไฟฟ้าด้วย PLC แบบเรียลไทม์',
-        courseCode: 'EE305',
-        uploadedBy: 'ผศ.ดร.วิชาญ สอนดี',
-        type: 'VIDEO',
-        fileSize: '450 MB',
-        status: 'PENDING_REVIEW',
-      },
-      {
-        id: 'mat-pending-2',
-        title: 'คู่มือความปลอดภัยปฏิบัติการเครื่องกลอุตสาหกรรม (PDF)',
-        courseCode: 'ME201',
-        uploadedBy: 'ผศ.ดร.วิชาญ สอนดี',
-        type: 'PDF',
-        fileSize: '15.4 MB',
-        status: 'PENDING_REVIEW',
-      },
-    ]);
   }, []);
 
   const handleOpenDecision = (item: any, type: 'COURSE' | 'MATERIAL', decision: 'APPROVE' | 'REJECT') => {

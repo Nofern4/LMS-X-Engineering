@@ -63,6 +63,12 @@ export default function RegistrarUsersPage() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccess, setModalSuccess] = useState<string | null>(null);
 
+  // Role Requests Queue State
+  const [roleRequests, setRoleRequests] = useState<any[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
+  const [requestFeedback, setRequestFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   // Add User Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -102,9 +108,79 @@ export default function RegistrarUsersPage() {
       .finally(() => setIsLoading(false));
   };
 
+  const fetchRoleRequests = () => {
+    setIsLoadingRequests(true);
+    fetch('/api/roles/request?all=true')
+      .then((r) => r.json())
+      .then((d) => {
+        setRoleRequests(d.requests || []);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setIsLoadingRequests(false));
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRoleRequests();
   }, [search, selectedRoleFilter]);
+
+  const handleApproveRequest = async (reqId: string) => {
+    setRequestActionLoading(reqId);
+    setRequestFeedback(null);
+    try {
+      const res = await fetch('/api/roles/request', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: reqId,
+          action: 'APPROVE',
+          reviewerEmail: 'registrar@x-karchang.ac.th',
+          reviewNote: 'นายทะเบียนตรวจสอบคุณสมบัติและอนุมัติสิทธิ์เรียบร้อยแล้ว',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการอนุมัติ' });
+      } else {
+        setRequestFeedback({ type: 'success', text: 'อนุมัติสิทธิ์ผู้ใช้งานสำเร็จแล้ว ระบบได้ปรับปรุงบทบาทเรียบร้อย' });
+        fetchUsers();
+        fetchRoleRequests();
+        window.dispatchEvent(new Event('role_updated'));
+      }
+    } catch (e) {
+      setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
+
+  const handleRejectRequest = async (reqId: string) => {
+    setRequestActionLoading(reqId);
+    setRequestFeedback(null);
+    try {
+      const res = await fetch('/api/roles/request', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: reqId,
+          action: 'REJECT',
+          reviewerEmail: 'registrar@x-karchang.ac.th',
+          reviewNote: 'นายทะเบียนปฏิเสธคำขอ เนื่องจากไม่ผ่านเกณฑ์การประเมินสิทธิ์',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการปฏิเสธ' });
+      } else {
+        setRequestFeedback({ type: 'success', text: 'ปฏิเสธคำขอสิทธิ์เรียบร้อยแล้ว' });
+        fetchRoleRequests();
+      }
+    } catch (e) {
+      setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
 
   const handleOpenEditModal = (u: any) => {
     setEditingUser(u);
@@ -281,6 +357,124 @@ export default function RegistrarUsersPage() {
           เพิ่มบุคลากร / ครูใหม่
         </Button>
       </div>
+
+      {/* Role Requests Notification Feedback */}
+      {requestFeedback && (
+        <div className={`p-4 rounded-2xl flex items-center justify-between gap-3 text-xs sm:text-sm font-bold animate-fadeIn ${
+          requestFeedback.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+            : 'bg-rose-50 text-rose-800 border border-rose-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 flex-shrink-0 text-emerald-600" />
+            <span>{requestFeedback.text}</span>
+          </div>
+          <button onClick={() => setRequestFeedback(null)} className="text-slate-500 hover:text-black">✕</button>
+        </div>
+      )}
+
+      {/* Section: Role Permission Requests Queue (คำขอสิทธิ์จากนักเรียนและบุคลากร) */}
+      {roleRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+        <Card className="border-amber-300 bg-amber-50/50 shadow-md overflow-hidden animate-fadeIn">
+          <CardHeader className="bg-amber-100/70 border-b border-amber-200 p-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+                <Shield className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-sm sm:text-base font-black text-amber-950">
+                  กล่องคำขอรับสิทธิ์ / ขอยกเลิกสิทธิ์ (รอนายทะเบียนพิจารณา)
+                </h2>
+                <p className="text-xs text-amber-800 font-medium">
+                  มีผู้ใช้งานยื่นคำขอสิทธิ์ผ่านเมนู Header จำนวน{' '}
+                  <span className="font-extrabold text-amber-950 underline">
+                    {roleRequests.filter((r) => r.status === 'PENDING').length} รายการ
+                  </span>
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={fetchRoleRequests}
+              className="text-xs font-bold bg-white text-slate-800 border-amber-300"
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              รีเฟรชคำขอ
+            </Button>
+          </CardHeader>
+
+          <div className="divide-y divide-amber-200/60 p-2 sm:p-4 space-y-3">
+            {roleRequests
+              .filter((r) => r.status === 'PENDING')
+              .map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 rounded-2xl bg-white border border-amber-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-slate-900">
+                        {req.user?.name || 'ผู้ใช้งาน'}
+                      </span>
+                      <span className="text-xs font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {req.user?.email}
+                      </span>
+                      <Badge
+                        variant={req.requestType === 'GRANT' ? 'warning' : 'danger'}
+                        size="sm"
+                        className="font-black text-[10px]"
+                      >
+                        {req.requestType === 'GRANT' ? '➕ ขอรับสิทธิ์ใหม่' : '➖ ขอยกเลิกสิทธิ์'}
+                      </Badge>
+                    </div>
+
+                    <div className="text-xs text-slate-700 flex flex-wrap items-center gap-2">
+                      <span>ต้องการ:</span>
+                      <span className="font-extrabold text-slate-900 bg-amber-100/70 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                        {req.roleName === 'COURSE_CREATOR_APPROVER' ? 'คนอนุมัติ (APPROVER)' : req.roleName}
+                      </span>
+                      {req.reason && (
+                        <span className="text-slate-600 italic">
+                          — เหตุผล: "{req.reason}"
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-400">
+                      ยื่นคำขอเมื่อ: {new Date(req.createdAt).toLocaleString('th-TH')}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isLoading={requestActionLoading === req.id}
+                      onClick={() => handleApproveRequest(req.id)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs"
+                      leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
+                    >
+                      อนุมัติคำขอนี้
+                    </Button>
+
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      isLoading={requestActionLoading === req.id}
+                      onClick={() => handleRejectRequest(req.id)}
+                      className="text-xs font-bold"
+                      leftIcon={<XCircle className="w-3.5 h-3.5" />}
+                    >
+                      ปฏิเสธ
+                    </Button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
 
       {/* Role Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">

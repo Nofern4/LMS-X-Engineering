@@ -3,6 +3,48 @@ import { prisma } from '@/lib/prisma';
 import { isAllowedInstitutionalEmail, isUserStatusActive } from '@/lib/auth';
 import { logAuditEvent } from '@/lib/rbac';
 
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email');
+    if (!email) {
+      return NextResponse.json({ error: 'กรุณาระบุอีเมล' }, { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        userRoles: {
+          include: { role: true }
+        }
+      }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'ไม่พบผู้ใช้งาน' }, { status: 404 });
+    }
+
+    let roles = user.userRoles.map(ur => ur.role.name);
+    if (roles.length > 0 && !roles.includes('STUDENT')) {
+      roles.push('STUDENT');
+    }
+
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        studentId: user.studentId,
+        department: user.department,
+        status: user.status,
+        roles,
+      }
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูล' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

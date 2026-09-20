@@ -27,13 +27,64 @@ export default function GlobalCoursesCatalogPage() {
   const [category, setCategory] = useState('');
   const [semester, setSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  // enrollmentStatuses: { [courseId]: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' }
+  const [enrollmentStatuses, setEnrollmentStatuses] = useState<Record<string, string>>({});
+  const [enrollingId, setEnrollingId] = useState<string | null>(null);
+
+  // ดึง user จาก localStorage
+  const getCurrentUser = () => {
+    if (typeof window === 'undefined') return null;
+    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
+  };
 
   useEffect(() => {
     fetch(`/api/courses?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&semester=${encodeURIComponent(semester)}`)
       .then((r) => r.json())
-      .then((d) => setCourses(d.courses || []))
+      .then(async (d) => {
+        const list: any[] = d.courses || [];
+        setCourses(list);
+
+        // สำหรับวิชาที่ต้องอนุมัติ ดึง enrollment status ของ user ปัจจุบัน
+        const user = getCurrentUser();
+        const statuses: Record<string, string> = {};
+        for (const c of list) {
+          if (c.accessType === 'APPROVAL_REQUIRED') {
+            try {
+              const r2 = await fetch(`/api/courses/${c.id}`);
+              const d2 = await r2.json();
+              const enrollments: any[] = d2.course?.enrollments || [];
+              const myEnroll = user
+                ? enrollments.find((e: any) => e.studentId === user.id || e.student?.id === user.id)
+                : null;
+              statuses[c.id] = myEnroll ? myEnroll.status : 'NONE';
+            } catch { statuses[c.id] = 'NONE'; }
+          } else {
+            statuses[c.id] = 'APPROVED';
+          }
+        }
+        setEnrollmentStatuses(statuses);
+      })
       .finally(() => setIsLoading(false));
   }, [search, category, semester]);
+
+  const handleEnroll = async (courseId: string) => {
+    const user = getCurrentUser();
+    if (!user) return;
+    setEnrollingId(courseId);
+    try {
+      const res = await fetch(`/api/courses/${courseId}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user }),
+      });
+      const data = await res.json();
+      if (data.enrollment) {
+        setEnrollmentStatuses((prev) => ({ ...prev, [courseId]: data.enrollment.status }));
+      }
+    } finally {
+      setEnrollingId(null);
+    }
+  };
 
   const categories = [
     { label: 'ทั้งหมด', value: '' },
@@ -54,82 +105,7 @@ export default function GlobalCoursesCatalogPage() {
     'AI401': 'https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80',
   };
 
-  const defaultCoursesList = [
-    {
-      id: 'course-1',
-      code: 'CS101',
-      title: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน',
-      category: 'วิศวกรรมคอมพิวเตอร์',
-      status: 'PUBLISHED',
-      accessType: 'PUBLIC',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 12,
-      clipsCount: 24,
-      image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'course-5',
-      code: 'SE302',
-      title: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ',
-      category: 'วิศวกรรมซอฟต์แวร์',
-      status: 'PUBLISHED',
-      accessType: 'PUBLIC',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 2,
-      clipsCount: 4,
-      image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'course-2',
-      code: 'ME201',
-      title: 'กลศาสตร์เครื่องกลและการออกแบบอัตโนมัติ',
-      category: 'ช่างกลโรงงาน',
-      status: 'PUBLISHED',
-      accessType: 'APPROVAL_REQUIRED',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 8,
-      clipsCount: 16,
-      image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'course-3',
-      code: 'EE305',
-      title: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT',
-      category: 'ช่างไฟฟ้ากำลัง',
-      status: 'PUBLISHED',
-      accessType: 'APPROVAL_REQUIRED',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 3,
-      clipsCount: 6,
-      image: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'course-4',
-      code: 'AUTO101',
-      title: 'เทคโนโลยีช่างยนต์และยานยนต์ไฟฟ้า EV',
-      category: 'เทคโนโลยีช่างยนต์',
-      status: 'PUBLISHED',
-      accessType: 'PUBLIC',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 3,
-      clipsCount: 6,
-      image: 'https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'course-6',
-      code: 'AI401',
-      title: 'ปัญญาประดิษฐ์และการเรียนรู้ของเครื่อง',
-      category: 'วิทยาการข้อมูล',
-      status: 'PENDING_APPROVAL',
-      accessType: 'APPROVAL_REQUIRED',
-      instructor: 'ผศ.ดร.วิชาญ สอนดี',
-      materialsCount: 0,
-      clipsCount: 0,
-      image: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80',
-    },
-  ];
-
-  const displayCourses = courses.length > 0 ? courses : defaultCoursesList;
+  const displayCourses = courses;
 
 
   return (
@@ -190,118 +166,146 @@ export default function GlobalCoursesCatalogPage() {
       </div>
 
       {/* Course Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayCourses.map((c: any) => {
-          const coverImg = c.image || courseImages[c.code] || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80';
-          const isClosed = c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED' || c.code === 'EE305' || c.code === 'ME201' || c.id === 'course-3' || c.id === 'course-2';
-          const instructorName = c.createdBy?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี';
-          const lessonsCount = c._count?.materials || c.materialsCount || 3;
-          const clipsCount = c.clipsCount || (lessonsCount * 2);
+      {displayCourses.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-xs">
+          <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-700 font-bold text-base">ไม่พบรายวิชาที่ตรงกับเงื่อนไขการค้นหา</p>
+          <p className="text-slate-400 text-xs mt-1">ลองเปลี่ยนคำค้นหาหรือเลือกหมวดหมู่อื่น</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayCourses.map((c: any) => {
+            const coverImg = c.image || courseImages[c.code] || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80';
+            const isClosed = c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED' || c.code === 'EE305' || c.code === 'ME201' || c.id === 'course-3' || c.id === 'course-2';
+            const instructorName = c.createdBy?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี';
+            const lessonsCount = c._count?.materials ?? 0;
+            const enrollmentsCount = c._count?.enrollments ?? 0;
 
-          const cleanTitle = (title: string) => {
-            if (!title) return '';
-            return title.replace(/\s*\([A-Za-z0-9\s&,.-]+\)/g, '').trim();
-          };
+            const cleanTitle = (title: string) => {
+              if (!title) return '';
+              return title.replace(/\s*\([A-Za-z0-9\s&,.-]+\)/g, '').trim();
+            };
 
-          return (
-            <div
-              key={c.id}
-              className="flex flex-col h-full overflow-hidden bg-white border border-slate-200/90 rounded-3xl hover:border-slate-300 shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group"
-            >
-              {/* Cover Photo Header */}
-              <div className="h-44 bg-slate-900 p-4 flex flex-col justify-between relative overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
-                  style={{ backgroundImage: `url('${coverImg}')` }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20" />
+            return (
+              <div
+                key={c.id}
+                className="flex flex-col h-full overflow-hidden bg-white border border-slate-200/90 rounded-3xl hover:border-slate-300 shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group"
+              >
+                {/* Cover Photo Header */}
+                <div className="h-44 bg-slate-900 p-4 flex flex-col justify-between relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
+                    style={{ backgroundImage: `url('${coverImg}')` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20" />
 
-                {/* Top Bar: Code Badge + Pure Icon Symbol for Open/Closed */}
-                <div className="flex items-center justify-between z-10">
-                  <span className="px-3.5 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs shadow-md">
-                    {c.code}
-                  </span>
-
-                  {isClosed ? (
-                    <span
-                      title="คลาสแบบปิด (ต้องขออนุมัติ)"
-                      className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-md"
-                    >
-                      <Lock className="w-4 h-4 text-amber-400" />
+                  {/* Top Bar: Code Badge + Pure Icon Symbol for Open/Closed */}
+                  <div className="flex items-center justify-between z-10">
+                    <span className="px-3.5 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs shadow-md">
+                      {c.code}
                     </span>
-                  ) : (
-                    <span
-                      title="วิชาเปิดทั่วไป (เข้าเรียนได้ทันที)"
-                      className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-md"
-                    >
-                      <Unlock className="w-4 h-4 text-emerald-400" />
+
+                    {isClosed ? (
+                      <span
+                        title="คลาสแบบปิด (ต้องขออนุมัติ)"
+                        className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-md"
+                      >
+                        <Lock className="w-4 h-4 text-amber-400" />
+                      </span>
+                    ) : (
+                      <span
+                        title="วิชาเปิดทั่วไป (เข้าเรียนได้ทันที)"
+                        className="w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-md"
+                      >
+                        <Unlock className="w-4 h-4 text-emerald-400" />
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="z-10">
+                    <p className="text-xs font-bold text-slate-200 uppercase tracking-wider">{c.category}</p>
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug group-hover:text-black transition-colors">
+                      {cleanTitle(c.title)}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      อาจารย์ผู้สอน: <span className="font-bold text-slate-900">{instructorName}</span>
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1.5 font-bold text-slate-700 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200">
+                      <BookOpen className="w-3.5 h-3.5 text-slate-700" />
+                      <span>{lessonsCount} บทเรียน</span>
                     </span>
-                  )}
-                </div>
-
-                <div className="z-10">
-                  <p className="text-xs font-bold text-slate-200 uppercase tracking-wider">{c.category}</p>
-                </div>
-              </div>
-
-              {/* Card Body */}
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug group-hover:text-black transition-colors">
-                    {cleanTitle(c.title)}
-                  </h3>
-                  <p className="text-xs text-slate-600 font-medium">
-                    อาจารย์ผู้สอน: <span className="font-bold text-slate-900">{instructorName}</span>
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-bold text-slate-700 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200">
-                    <BookOpen className="w-3.5 h-3.5 text-slate-700" />
-                    <span>{lessonsCount} บทเรียน ({clipsCount} คลิป)</span>
-                  </span>
-                </div>
+                    <span className="inline-flex items-center gap-1 text-slate-500 font-semibold">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>{enrollmentsCount} ผู้เรียน</span>
+                    </span>
+                  </div>
 
                 {(() => {
                   const isPendingCourse = c.status === 'PENDING_APPROVAL';
-                  const isApproved = typeof window !== 'undefined'
-                    ? (localStorage.getItem(`course_approved_${c.id}`) === 'true' || localStorage.getItem(`course_approved_${c.code}`) === 'true')
-                    : false;
-                  const isPending = isClosed && !isApproved;
-                  
-                  let buttonText = 'เข้าสู่ห้องเรียน';
-                  let btnBg = 'bg-[#CEF34B] hover:bg-[#bce038] text-black';
-                  
-                  if (isPendingCourse) {
-                    buttonText = 'รอพิจารณาเปิดรายวิชา';
-                    btnBg = 'bg-slate-100 text-slate-500 cursor-not-allowed border border-slate-200';
-                  } else if (isPending) {
-                    buttonText = 'รออนุมัติเข้าเรียน';
-                  }
+                  const enrollStatus = enrollmentStatuses[c.id]; // 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' | undefined
+                  const isEnrolling = enrollingId === c.id;
 
+                  // วิชารอพิจารณาสร้าง
                   if (isPendingCourse) {
                     return (
-                      <Button
-                        disabled
-                        variant="secondary"
-                        size="md"
-                        className={`w-full font-bold rounded-full py-3 text-xs shadow-none flex items-center justify-center ${btnBg}`}
-                      >
-                        <span>{buttonText}</span>
+                      <Button disabled variant="secondary" size="md"
+                        className="w-full font-bold rounded-full py-3 text-xs shadow-none bg-slate-100 text-slate-500 cursor-not-allowed border border-slate-200">
+                        <span>รอพิจารณาเปิดรายวิชา</span>
                       </Button>
                     );
                   }
 
-                  return (
-                    <Link href={`/learning/${c.id}`} className="block w-full">
-                      <Button
-                        variant="primary"
-                        size="md"
-                        className={`w-full font-extrabold rounded-full py-3 text-xs shadow-xs flex items-center justify-center transition-all ${btnBg}`}
-                      >
-                        <span>{buttonText}</span>
+                  // วิชาเปิดหรืออนุมัติแล้ว → เข้าเรียนเลย
+                  if (!isClosed || enrollStatus === 'APPROVED') {
+                    return (
+                      <Link href={`/learning/${c.id}`} className="block w-full">
+                        <Button variant="primary" size="md"
+                          className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-[#CEF34B] hover:bg-[#bce038] text-black flex items-center justify-center transition-all">
+                          เข้าสู่ห้องเรียน
+                        </Button>
+                      </Link>
+                    );
+                  }
+
+                  // รออนุมัติอยู่
+                  if (enrollStatus === 'PENDING') {
+                    return (
+                      <Button disabled variant="secondary" size="md"
+                        className="w-full font-bold rounded-full py-3 text-xs shadow-none bg-amber-50 text-amber-700 border border-amber-300 cursor-not-allowed">
+                        ⏳ รออนุมัติจากอาจารย์
                       </Button>
-                    </Link>
+                    );
+                  }
+
+                  // ถูกปฏิเสธ → ขอใหม่ได้
+                  if (enrollStatus === 'REJECTED') {
+                    return (
+                      <Button variant="primary" size="md"
+                        disabled={isEnrolling}
+                        onClick={() => handleEnroll(c.id)}
+                        className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-rose-600 hover:bg-rose-700 text-white border-0 flex items-center justify-center transition-all">
+                        {isEnrolling ? 'กำลังส่ง...' : '↩ ขอเข้าร่วมใหม่อีกครั้ง'}
+                      </Button>
+                    );
+                  }
+
+                  // ยังไม่ได้สมัคร (NONE) หรือ status ยังโหลดอยู่
+                  return (
+                    <Button variant="primary" size="md"
+                      disabled={isEnrolling}
+                      onClick={() => handleEnroll(c.id)}
+                      className="w-full font-extrabold rounded-full py-3 text-xs shadow-xs bg-slate-900 hover:bg-slate-700 text-[#CEF34B] border-0 flex items-center justify-center transition-all">
+                      {isEnrolling ? 'กำลังส่ง...' : '✋ ขอเข้าร่วมเรียน'}
+                    </Button>
                   );
                 })()}
               </div>
@@ -309,6 +313,7 @@ export default function GlobalCoursesCatalogPage() {
           );
         })}
       </div>
-    </div>
+    )}
+  </div>
   );
 }

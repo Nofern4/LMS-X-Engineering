@@ -31,13 +31,13 @@ export default function DirectorDashboard() {
   }, []);
 
   const overview = data?.overview || {
-    totalStudents: 9,
+    totalStudents: 4609,
     totalProfessors: 4,
     totalApprovers: 5,
     totalCourses: 6,
     publishedCourses: 5,
     pendingCourses: 1,
-    totalEnrollments: 3,
+    totalEnrollments: 5552,
     totalMaterials: 28,
     totalVideos: 16,
     storageUsedGb: '7.21',
@@ -120,7 +120,7 @@ export default function DirectorDashboard() {
           <div>
             <p className="text-xs font-semibold text-slate-500">สื่อการเรียนรู้ทั้งหมด</p>
             <p className="text-2xl font-black text-slate-900">{overview.totalMaterials} รายการ</p>
-            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">คลังสื่อการสอนและเอกสาร</p>
+            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">วิดีโอ {overview.totalVideos || 15} คลิป • เอกสาร/ตำรา 8 ไฟล์</p>
           </div>
         </div>
       </div>
@@ -203,7 +203,7 @@ export default function DirectorDashboard() {
               </div>
               <div className="flex justify-between items-center py-1">
                 <span className="text-slate-500">สื่อและวิดีโอที่อัปโหลด:</span>
-                <span className="font-extrabold text-slate-900">{overview.totalMaterials} บทเรียน</span>
+                <span className="font-extrabold text-slate-900">{overview.totalMaterials} รายการ ({overview.totalVideos || 15} วิดีโอ)</span>
               </div>
             </div>
           </div>

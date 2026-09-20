@@ -6,21 +6,20 @@ import { Header } from '@/components/layout/Header';
 import { DemoRoleSwitcher } from '@/components/layout/DemoRoleSwitcher';
 import { RoleName } from '@/lib/rbac';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { usePageTranslator } from '@/lib/i18n/usePageTranslator';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  usePageTranslator();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchCurrentUserData = () => {
     // Read email from session/demo switcher
     const demoEmail = localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th';
 
     // Fetch live user info via auth API
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: demoEmail }),
-    })
+    fetch(`/api/auth/login?email=${encodeURIComponent(demoEmail)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.user) {
@@ -38,14 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setCurrentUser({
             id: 'demo-user-1',
             name: demoEmail.includes('registrar')
-              ? 'นายอนุมัติ ทะเบียนเรียน (Registrar)'
+              ? 'นายอนุมัติ ทะเบียนเรียน'
               : demoEmail.includes('director')
-              ? 'ผอ.ดร.บริหาร วิสัยทัศน์ (ผอ. มหาลัย Xการช่าง)'
+              ? 'ผอ.ดร.บริหาร วิสัยทัศน์'
               : demoEmail.includes('prof')
-              ? 'ผศ.ดร.วิชาญ สอนดี (อาจารย์ Xการช่าง)'
+              ? 'ผศ.ดร.วิชาญ สอนดี'
               : demoEmail.includes('approver')
-              ? 'รศ.ดร.อนุมัติ วิชาการ (คนอนุมัติ)'
-              : 'สมชาย ช่างกล (นักศึกษา)',
+              ? 'รศ.ดร.อนุมัติ วิชาการ'
+              : 'สมชาย ช่างกล',
             email: demoEmail,
             roles: getRolesForEmail(demoEmail),
           });
@@ -60,43 +59,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         });
       })
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCurrentUserData();
+    window.addEventListener('role_updated', fetchCurrentUserData);
+    return () => window.removeEventListener('role_updated', fetchCurrentUserData);
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen bg-[#f8fafc] items-center justify-center font-sans">
-        <div className="space-y-4 text-center">
-          <Skeleton className="h-12 w-12 rounded-2xl mx-auto bg-slate-200" />
-          <Skeleton className="h-4 w-48 mx-auto bg-slate-200" />
-          <p className="text-xs text-slate-500 font-bold">กำลังโหลดเลเยอร์หน้าเว็บ มหาวิทยาลัย Xการช่าง...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const pathname = usePathname();
   let role: RoleName = currentUser?.roles?.[0] || 'STUDENT';
   let userName = currentUser?.name || 'ผู้ใช้งาน';
 
+  const userHasApproverRole = currentUser?.roles?.includes('COURSE_CREATOR_APPROVER') || currentUser?.roles?.includes('APPROVER');
+  const userHasDirectorRole = currentUser?.roles?.includes('DIRECTOR');
+  const userHasProfessorRole = currentUser?.roles?.includes('PROFESSOR');
+  const userHasRegistrarRole = currentUser?.roles?.includes('REGISTRAR');
+
   if (pathname?.startsWith('/course-approver') || pathname?.startsWith('/content-approver')) {
     role = 'COURSE_CREATOR_APPROVER';
-    if (!currentUser || currentUser?.roles?.[0] === 'STUDENT') {
-      userName = 'รศ.ดร.อนุมัติ วิชาการ (คนอนุมัติ)';
+    if (!userHasApproverRole && currentUser?.roles?.[0] === 'STUDENT') {
+      userName = 'รศ.ดร.อนุมัติ วิชาการ';
     }
   } else if (pathname?.startsWith('/director')) {
     role = 'DIRECTOR';
-    if (!currentUser || currentUser?.roles?.[0] === 'STUDENT') {
-      userName = 'ผอ.ดร.บริหาร วิสัยทัศน์ (ผอ. มหาลัย Xการช่าง)';
+    if (!userHasDirectorRole && currentUser?.roles?.[0] === 'STUDENT') {
+      userName = 'ผอ.ดร.บริหาร วิสัยทัศน์';
     }
   } else if (pathname?.startsWith('/professor')) {
     role = 'PROFESSOR';
-    if (!currentUser || currentUser?.roles?.[0] === 'STUDENT') {
-      userName = 'ผศ.ดร.วิชาญ สอนดี (อาจารย์ Xการช่าง)';
+    if (!userHasProfessorRole && currentUser?.roles?.[0] === 'STUDENT') {
+      userName = 'ผศ.ดร.วิชาญ สอนดี';
     }
   } else if (pathname?.startsWith('/registrar')) {
     role = 'REGISTRAR';
-    if (!currentUser || currentUser?.roles?.[0] === 'STUDENT') {
-      userName = 'นายอนุมัติ ทะเบียนเรียน (Registrar)';
+    if (!userHasRegistrarRole && currentUser?.roles?.[0] === 'STUDENT') {
+      userName = 'นายอนุมัติ ทะเบียนเรียน';
     }
   }
 

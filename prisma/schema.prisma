@@ -84,9 +84,13 @@ model User {
   auditLogs           AuditLog[]
   materialAccesses    MaterialAccessLog[]
   attendances         Attendance[]
+  roleRequests         RoleRequest[]        @relation("UserRoleRequests")
+  reviewedRoleRequests RoleRequest[]        @relation("ReviewedRoleRequests")
 
   @@index([email])
   @@index([status])
+  @@index([studentId])
+  @@index([department])
 }
 
 model Role {
@@ -165,6 +169,8 @@ model CourseEnrollment {
 
   @@unique([courseId, studentId])
   @@index([status])
+  @@index([studentId])
+  @@index([courseId])
 }
 
 model LearningMaterial {
@@ -284,4 +290,36 @@ model Attendance {
   @@index([courseId])
   @@index([studentId])
 }
+
+enum RoleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RoleRequestType {
+  GRANT
+  REVOKE
+}
+
+model RoleRequest {
+  id          String            @id @default(uuid())
+  userId      String
+  roleName    String            // e.g. COURSE_CREATOR_APPROVER, PROFESSOR, etc.
+  requestType RoleRequestType   @default(GRANT)
+  status      RoleRequestStatus @default(PENDING)
+  reason      String?
+  reviewerId  String?
+  reviewNote  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  user     User  @relation("UserRoleRequests", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ReviewedRoleRequests", fields: [reviewerId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
 

@@ -22,9 +22,17 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       .then((r) => r.json())
       .then((data) => {
         setCourse(data.course);
-        // Check local demo enrollment status
-        if (id === 'course-1' || data.course?.code === 'CS101' || data.course?.accessType === 'OPEN') {
+        const userEmail = typeof window !== 'undefined'
+          ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
+          : 'student@student.x-karchang.ac.th';
+
+        const myEnroll = data.course?.enrollments?.find((e: any) => e.student?.email === userEmail);
+        if (myEnroll) {
+          setEnrollmentStatus(myEnroll.status);
+        } else if (data.course?.accessType === 'OPEN') {
           setEnrollmentStatus('APPROVED');
+        } else {
+          setEnrollmentStatus(null);
         }
       })
       .finally(() => setIsLoading(false));
@@ -33,10 +41,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const handleRequestEnroll = async () => {
     setIsRequesting(true);
     try {
-      const res = await fetch(`/api/courses/${id}/enroll`, {
+      const userEmail = typeof window !== 'undefined'
+        ? (localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th')
+        : 'student@student.x-karchang.ac.th';
+
+      const res = await fetch(`/api/courses/${course?.id || id}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: { id: 'student-1', roles: ['STUDENT'] } }),
+        body: JSON.stringify({ user: { email: userEmail, roles: ['STUDENT'] } }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -84,6 +96,28 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           <span className="px-3 py-1 rounded-full bg-white/10 text-slate-200 font-medium text-xs">
             {course.category}
           </span>
+          {/* Capability badges matching user requirements */}
+          {course.code === 'ME201' ? (
+            <span className="px-3 py-1 rounded-full bg-blue-950/90 text-blue-300 font-bold text-xs border border-blue-500/30 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <span>คอร์สเน้นตำราและแบบวิศวกรรม (ไม่มีคลิปวิดีโอ)</span>
+            </span>
+          ) : course.code === 'SE302' ? (
+            <span className="px-3 py-1 rounded-full bg-indigo-950/90 text-indigo-300 font-bold text-xs border border-indigo-500/30 flex items-center gap-1.5">
+              <PlayCircle className="w-3.5 h-3.5 text-indigo-400" />
+              <span>คลิปบรรยายพร้อมควิซ (ไม่มีเอกสารประกอบ)</span>
+            </span>
+          ) : course.code === 'AUTO101' ? (
+            <span className="px-3 py-1 rounded-full bg-purple-950/90 text-purple-300 font-bold text-xs border border-purple-500/30 flex items-center gap-1.5">
+              <PlayCircle className="w-3.5 h-3.5 text-purple-400" />
+              <span>คลิปวิดีโอ + เอกสารคู่มือ (ไม่มีแบบทดสอบ)</span>
+            </span>
+          ) : (
+            <span className="px-3 py-1 rounded-full bg-emerald-950/90 text-emerald-300 font-bold text-xs border border-emerald-500/30 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>ครบวงจร: วิดีโอ + เอกสาร + แบบทดสอบหลังเรียน</span>
+            </span>
+          )}
         </div>
 
         <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">{course.title}</h1>
@@ -100,7 +134,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           </div>
           <div>
             <span className="text-slate-400 block text-xs">ผู้เรียนในรายวิชา:</span>
-            <span className="font-bold text-white text-xs">{course._count?.enrollments || 1} คน</span>
+            <span className="font-bold text-white text-xs">{course._count?.enrollments ?? 0} คน</span>
           </div>
         </div>
       </div>
@@ -154,43 +188,60 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         <div className="bg-slate-50 p-4 border-b border-slate-200">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-emerald-600" />
-            <span>สื่อการเรียนรู้ในวิชานี้ ({course.materials?.length || 2} บทเรียน)</span>
+            <span>สื่อการเรียนรู้ในวิชานี้ ({course.materials?.length ?? 0} สื่อบทเรียน)</span>
           </h3>
         </div>
 
         <div className="divide-y divide-slate-100">
-          {course.materials?.map((m: any, idx: number) => (
-            <div key={m.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center font-bold text-xs">
-                  {idx + 1}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-slate-900">{m.title}</h4>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold text-[10px]">
-                      {m.type}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{m.description || 'สื่อการสอนในระบบ'}</p>
-                </div>
-              </div>
-
-              <div>
-                {enrollmentStatus === 'APPROVED' ? (
-                  <Link href={`/learning/${course.id}`}>
-                    <Button variant="ghost" size="sm" className="text-slate-900 hover:bg-slate-100 rounded-lg text-xs font-bold" leftIcon={<PlayCircle className="w-3.5 h-3.5 text-amber-600" />}>
-                      รับชมสื่อ
-                    </Button>
-                  </Link>
-                ) : (
-                  <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-slate-400" /> ต้องให้คนอนุมัติก่อน
-                  </span>
-                )}
-              </div>
+          {(!course.materials || course.materials.length === 0) ? (
+            <div className="p-8 text-center text-slate-400 text-xs font-medium">
+              ยังไม่มีสื่อการเรียนรู้ในรายวิชานี้
             </div>
-          ))}
+          ) : (
+            course.materials.map((m: any, idx: number) => {
+              const isVideo = m.type === 'VIDEO';
+              return (
+                <div key={m.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                      isVideo 
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}>
+                      {isVideo ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-slate-900">{m.title}</h4>
+                        <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
+                          isVideo 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {isVideo ? 'วิดีโอบรรยาย' : 'เอกสาร / ตำรา'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{m.description || 'สื่อการสอนในระบบ'}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {enrollmentStatus === 'APPROVED' ? (
+                      <Link href={`/learning/${course.id}`}>
+                        <Button variant="ghost" size="sm" className="text-slate-900 hover:bg-slate-100 rounded-lg text-xs font-bold" leftIcon={isVideo ? <PlayCircle className="w-3.5 h-3.5 text-amber-600" /> : <FileText className="w-3.5 h-3.5 text-blue-600" />}>
+                          {isVideo ? 'รับชมวิดีโอ' : 'เปิดอ่านเอกสาร'}
+                        </Button>
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-slate-400" /> ต้องให้คนอนุมัติก่อน
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

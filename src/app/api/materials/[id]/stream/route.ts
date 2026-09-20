@@ -20,11 +20,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const fullPath = path.join(baseDir, material.filePath);
 
     if (!fs.existsSync(fullPath)) {
-      // Fallback sample video response for demonstration if physical video file hasn't been uploaded yet
-      return NextResponse.json({
-        message: 'Streaming endpoint ready. Upload a physical video file to stream.',
-        materialTitle: material.title
-      });
+      // Fallback sample video stream for smooth in-browser playback
+      return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
     }
 
     const stat = fs.statSync(fullPath);

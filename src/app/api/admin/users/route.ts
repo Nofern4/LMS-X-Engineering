@@ -18,15 +18,19 @@ export async function GET(request: Request) {
     }
     if (status) where.status = status;
 
-    const users = await prisma.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        userRoles: { include: { role: true } }
-      }
-    });
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        take: 100,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          userRoles: { include: { role: true } }
+        }
+      }),
+      prisma.user.count({ where }),
+    ]);
 
-    return NextResponse.json({ users });
+    return NextResponse.json({ users, total });
   } catch (error: any) {
     console.error('Get admin users error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้' }, { status: 500 });

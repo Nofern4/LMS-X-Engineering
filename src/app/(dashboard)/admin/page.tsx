@@ -9,10 +9,17 @@ import { Badge } from '@/components/ui/Badge';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
+  const [totalUsers, setTotalUsers] = useState<number>(4615);
   const [settings, setSettings] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/admin/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
+    fetch('/api/admin/users')
+      .then((r) => r.json())
+      .then((d) => {
+        setUsers(d.users || []);
+        if (d.total) setTotalUsers(d.total);
+        else if (d.users) setTotalUsers(d.users.length);
+      });
     fetch('/api/admin/system').then((r) => r.json()).then((d) => setSettings(d.settings || []));
   }, []);
 
@@ -48,7 +55,7 @@ export default function AdminDashboard() {
           </div>
           <div>
             <p className="text-xs font-medium text-[#75583f]">ผู้ใช้งานในระบบทั้งหมด</p>
-            <p className="text-xl font-bold text-[#3d2c20]">{users.length || 7} บัญชี</p>
+            <p className="text-xl font-bold text-[#3d2c20]">{totalUsers.toLocaleString()} บัญชี</p>
           </div>
         </div>
 
@@ -58,8 +65,8 @@ export default function AdminDashboard() {
           </div>
           <div>
             <p className="text-xs font-medium text-[#75583f]">โดเมนสถาบันที่อนุญาต</p>
-            <p className="text-xs font-mono font-semibold text-[#9c6843] mt-0.5">@student.institution.ac.th</p>
-            <p className="text-xs font-mono font-semibold text-[#9c6843]">@institution.ac.th</p>
+            <p className="text-xs font-mono font-semibold text-[#9c6843] mt-0.5">@student.x-karchang.ac.th</p>
+            <p className="text-xs font-mono font-semibold text-[#9c6843]">@x-karchang.ac.th</p>
           </div>
         </div>
 
