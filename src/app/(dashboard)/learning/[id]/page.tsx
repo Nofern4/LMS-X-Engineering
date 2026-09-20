@@ -574,7 +574,6 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                     : `/api/materials/${activeMaterial?.id}/stream`
                 }
                 title={activeMaterial?.title}
-                poster="/assets/poster_placeholder.png"
               />
             ) : (
               /* Dedicated Document & Blueprint Viewer (Minimalist Dark / Brand Aligned) */

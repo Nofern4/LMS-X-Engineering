@@ -79,8 +79,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (file) {
       const storage = getStorageService();
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const uploaded = await storage.upload(buffer, file.name, file.type, `courses/${id}`);
+      let buffer = Buffer.from(await file.arrayBuffer());
+      let fileName = file.name;
+      let fileType = file.type;
+
+      // Auto-convert QuickTime (.mov) containers with H.264 video to web-standard .mp4 for instant browser playback
+      if (fileName.toLowerCase().endsWith('.mov') || fileType === 'video/quicktime') {
+        if (buffer.length > 20 && buffer.toString('ascii', 4, 8) === 'ftyp') {
+          buffer.write('isom', 8, 4, 'ascii');
+          buffer.write('mp42', 16, 4, 'ascii');
+          fileName = fileName.replace(/\.mov$/i, '.mp4');
+          fileType = 'video/mp4';
+        }
+      }
+
+      const uploaded = await storage.upload(buffer, fileName, fileType, `courses/${id}`);
       filePath = uploaded.filePath;
       mimeType = uploaded.mimeType;
     }

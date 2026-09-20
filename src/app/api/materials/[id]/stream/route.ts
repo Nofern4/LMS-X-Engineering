@@ -28,32 +28,49 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const baseDir = path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads');
     const fullPath = path.join(baseDir, material.filePath);
+    let activeStreamPath = fullPath;
+    let ext = path.extname(material.filePath).toLowerCase();
 
-    if (!fs.existsSync(fullPath)) {
-      // Fallback sample video stream for smooth in-browser playback
-      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
+    // If file is .mov, check or convert to browser-compatible .mp4 so the user's actual video plays
+    if (ext === '.mov') {
+      const mp4Path = fullPath.replace(/\.mov$/i, '.mp4');
+      if (fs.existsSync(mp4Path)) {
+        activeStreamPath = mp4Path;
+        ext = '.mp4';
+      } else {
+        try {
+          const buf = fs.readFileSync(fullPath);
+          if (buf.length > 20 && buf.toString('ascii', 4, 8) === 'ftyp') {
+            const newBuf = Buffer.from(buf);
+            newBuf.write('isom', 8, 4, 'ascii');
+            newBuf.write('mp42', 16, 4, 'ascii');
+            fs.writeFileSync(mp4Path, newBuf);
+            activeStreamPath = mp4Path;
+            ext = '.mp4';
+          }
+        } catch (e) {
+          console.error('Error preparing mp4 for mov:', e);
+        }
+      }
     }
 
-    const ext = path.extname(material.filePath).toLowerCase();
-
-    // Browsers like Chrome on Windows cannot play raw QuickTime (.mov) containers in HTML5 video
-    // In this case, redirect to a compatible web-ready video stream so the student can watch immediately
-    if (ext === '.mov' || ext === '.avi' || ext === '.mkv' || ext === '.wmv') {
+    if (!fs.existsSync(activeStreamPath)) {
       return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
     }
 
     const mimeMap: Record<string, string> = {
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
+      '.mov': 'video/mp4',
       '.m4v': 'video/mp4',
       '.ogv': 'video/ogg',
       '.ogg': 'video/ogg',
       '.mp3': 'audio/mpeg',
       '.pdf': 'application/pdf',
     };
-    const contentType = mimeMap[ext] || material.mimeType || 'video/mp4';
+    const contentType = mimeMap[ext] || 'video/mp4';
 
-    const stat = fs.statSync(fullPath);
+    const stat = fs.statSync(activeStreamPath);
     const fileSize = stat.size;
     const range = request.headers.get('range');
 
