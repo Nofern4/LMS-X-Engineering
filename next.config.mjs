@@ -7,8 +7,18 @@ const nextConfig = {
     },
   },
   outputFileTracingIncludes: {
-    '/api/**/*': ['./prisma/dev.db', './prisma/schema.prisma'],
-    '/*': ['./prisma/dev.db', './prisma/schema.prisma'],
+    '/api/**': ['./prisma/dev.db', './public/data/dev.db', './prisma/schema.prisma'],
+    '/**': ['./prisma/dev.db', './public/data/dev.db', './prisma/schema.prisma'],
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/data/:path*',
+          destination: '/_not-found',
+        },
+      ],
+    };
   },
 };
 

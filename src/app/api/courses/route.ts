@@ -85,7 +85,9 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error('Get courses error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error?.message ? `เกิดข้อผิดพลาด: ${error.message}` : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' 
+    }, { status: 500 });
   }
 }
 
@@ -211,6 +213,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'สร้างรายวิชาฉบับร่างสำเร็จ', course: serializedCourse });
   } catch (error: any) {
     console.error('Create course error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error?.message ? `เกิดข้อผิดพลาด: ${error.message}` : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' 
+    }, { status: 500 });
   }
 }

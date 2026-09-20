@@ -413,12 +413,16 @@ function ProfessorDashboardContent() {
         }
       } catch {}
 
-      // Prepare initial material:
-      // If user uploaded a physical file, we do NOT create a dummy initial material here
-      // because it will be uploaded directly via /api/courses/${id}/materials right below.
-      // If user provided a video link (YouTube, Drive, etc.), create the material with that link.
       const initialMaterialPayload = uploadedFile
-        ? null
+        ? {
+            title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${newTitle.trim()}`,
+            type: materialType,
+            filePath: videoLinkUrl.trim() || uploadedFile.name,
+            videoUrl: videoLinkUrl.trim() || '',
+            fileSize: uploadedFile.size || 52428800,
+            mimeType: uploadedFile.type || (materialType === 'VIDEO' ? 'video/mp4' : 'application/pdf'),
+            description: '',
+          }
         : videoLinkUrl.trim()
         ? {
             title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${newTitle.trim()}`,
