@@ -188,6 +188,7 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
     ) {
       return [
         { label: translate('ศูนย์อนุมัติ', currentLang), href: '/course-approver', icon: <ShieldCheck className="w-4 h-4" /> },
+        { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
       ];
     }
 
@@ -197,6 +198,7 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
     ) {
       return [
         { label: translate('ศูนย์สิทธิ์นายทะเบียน', currentLang), href: '/registrar/users', icon: <UserCheck className="w-4 h-4" /> },
+        { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
       ];
     }
 
@@ -208,12 +210,13 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
         ];
       case 'PROFESSOR':
         return [
-          { label: translate('ระบบจัดการการสอน', currentLang), href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
         ];
       case 'DIRECTOR':
         return [
           { label: translate('แดชบอร์ดบริหาร', currentLang), href: '/director', icon: <Eye className="w-4 h-4" /> },
           { label: translate('ภาพรวมรายวิชา', currentLang), href: '/courses', icon: <BookOpen className="w-4 h-4" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <BookOpen className="w-4 h-4" /> },
         ];
       default:
         return [

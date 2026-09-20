@@ -120,7 +120,7 @@ export default function DirectorDashboard() {
           <div>
             <p className="text-xs font-semibold text-slate-500">สื่อการเรียนรู้ทั้งหมด</p>
             <p className="text-2xl font-black text-slate-900">{overview.totalMaterials} รายการ</p>
-            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">วิดีโอ {overview.totalVideos || 15} คลิป • เอกสาร/ตำรา 8 ไฟล์</p>
+            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">วิดีโอ {overview.totalVideos || 15} คลิป • เอกสาร</p>
           </div>
         </div>
       </div>
@@ -398,4 +398,3 @@ export default function DirectorDashboard() {
     </div>
   );
 }
-

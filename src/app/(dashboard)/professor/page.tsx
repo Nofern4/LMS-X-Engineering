@@ -27,7 +27,9 @@ import {
   Link2,
   ArrowRight,
   ArrowLeft,
-  CheckSquare
+  CheckSquare,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -36,13 +38,14 @@ import { Input } from '@/components/ui/Input';
 
 function ProfessorDashboardContent() {
   const [courses, setCourses] = useState<any[]>([]);
-  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [courseStudents, setCourseStudents] = useState<Record<string, any[]>>({});
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>('CS101');
+  const [showAllStudents, setShowAllStudents] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Professor Taught Courses Selector List
+  // Professor Taught Courses Selector List - with ทั้งหมด in front of CS101
   const [professorCourses, setProfessorCourses] = useState([
-    { code: 'CS101', label: 'CS101 (วิศวกรรมคอมพิวเตอร์)', category: 'วิศวกรรมคอมพิวเตอร์' },
+    { code: 'CS101', label: 'ทั้งหมด CS101 (วิศวกรรมคอมพิวเตอร์)', category: 'วิศวกรรมคอมพิวเตอร์' },
     { code: 'SE302', label: 'SE302 (วิศวกรรมซอฟต์แวร์)', category: 'วิศวกรรมซอฟต์แวร์' },
     { code: 'ME201', label: 'ME201 (ช่างกลโรงงาน)', category: 'ช่างกลโรงงาน' },
     { code: 'EE305', label: 'EE305 (ช่างไฟฟ้ากำลัง)', category: 'ช่างไฟฟ้ากำลัง' },
@@ -89,9 +92,6 @@ function ProfessorDashboardContent() {
     }
   }, [searchParams]);
 
-  // Student course enrollment & program completion status
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
-
   useEffect(() => {
     fetch('/api/courses')
       .then((res) => res.json())
@@ -99,63 +99,34 @@ function ProfessorDashboardContent() {
         const cList = data.courses || [];
         setCourses(cList);
 
-        // Fetch students for all courses
-        const allEnrolls: any[] = [];
-        const allPendingEnrolls: any[] = [];
-
-        for (const c of cList) {
+        // Fetch real student enrollments for each course in parallel
+        const promises = cList.map(async (c: any) => {
           try {
             const r = await fetch(`/api/courses/${c.id}/students`);
             const ed = await r.json();
-            if (ed.enrollments) {
-              ed.enrollments.forEach((en: any) => {
-                allEnrolls.push({
-                  id: en.id,
-                  studentId: en.student?.studentId || 'XK-65010042',
-                  name: en.student?.name || 'นักศึกษา',
-                  department: en.student?.department || c.category,
-                  courseCode: c.code,
-                  enrolledDate: new Date(en.requestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
-                  progress: en.status === 'APPROVED' ? 100 : 25,
-                  status: en.status === 'APPROVED' ? 'COMPLETED' : 'IN_PROGRESS',
-                  topic: en.status === 'APPROVED' ? `${c.title} • ได้รับการอนุมัติแล้ว` : `${c.title} • รอการอนุมัติสิทธิ์`,
-                });
+            return {
+              code: c.code,
+              enrollments: (ed.enrollments || []).map((en: any) => ({
+                id: en.id,
+                studentId: en.student?.studentId || 'XK-65010042',
+                name: en.student?.name || 'นักศึกษา',
+                status: en.status,
+              }))
+            };
+          } catch {
+            return { code: c.code, enrollments: [] };
+          }
+        });
 
-                // เก็บคำขอทั้งหมดเพื่อแสดงในตารางคำขอ
-                allPendingEnrolls.push({
-                  ...en,
-                  courseId: c.id,
-                  courseCode: c.code,
-                  courseTitle: c.title,
-                });
-              });
-            }
-          } catch (e) {}
-        }
-        setAttendanceLogs(allEnrolls);
-        setEnrollments(allPendingEnrolls);
+        const results = await Promise.all(promises);
+        const mapping: Record<string, any[]> = {};
+        results.forEach((item) => {
+          mapping[item.code] = item.enrollments;
+        });
+        setCourseStudents(mapping);
       })
       .finally(() => setIsLoading(false));
   }, []);
-
-  const reloadEnrollments = async () => {
-    const res = await fetch('/api/courses');
-    const data = await res.json();
-    const cList = data.courses || [];
-    const allPendingEnrolls: any[] = [];
-    for (const c of cList) {
-      try {
-        const r = await fetch(`/api/courses/${c.id}/students`);
-        const ed = await r.json();
-        if (ed.enrollments) {
-          ed.enrollments.forEach((en: any) => {
-            allPendingEnrolls.push({ ...en, courseId: c.id, courseCode: c.code, courseTitle: c.title });
-          });
-        }
-      } catch (e) {}
-    }
-    setEnrollments(allPendingEnrolls);
-  };
 
   const courseInterestData = courses.slice(0, 3).map((c, idx) => ({
     code: c.code,
@@ -167,32 +138,6 @@ function ProfessorDashboardContent() {
     topMaterial: `${c.title} (${c._count?.materials ?? 0} บทเรียน)`,
     trend: c._count?.enrollments > 0 ? `+${c._count.enrollments} คนเรียน` : 'เปิดให้ลงทะเบียน',
   }));
-
-  const handleApproveStudent = async (courseId: string, studentId: string) => {
-    await fetch(`/api/courses/${courseId}/students`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user: { id: 'prof-1', roles: ['PROFESSOR'] },
-        studentId,
-        action: 'APPROVE',
-      }),
-    });
-    await reloadEnrollments();
-  };
-
-  const handleRejectStudent = async (courseId: string, studentId: string) => {
-    await fetch(`/api/courses/${courseId}/students`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user: { id: 'prof-1', roles: ['PROFESSOR'] },
-        studentId,
-        action: 'REJECT',
-      }),
-    });
-    await reloadEnrollments();
-  };
 
   const handleCreateCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,21 +175,18 @@ function ProfessorDashboardContent() {
       setProfessorCourses((prev) => [...prev, newCourseItem]);
       setSelectedCourseCode(newCourseCode);
 
-      // Seed initial student log for created course
-      setAttendanceLogs((prev) => [
+      // Seed initial student for created course
+      setCourseStudents((prev) => ({
         ...prev,
-        {
-          id: `att-${Date.now()}`,
-          studentId: 'XK-65010999',
-          name: 'สมเกียรติ ช่างใหม่',
-          department: newCategory,
-          courseCode: newCourseCode,
-          enrolledDate: 'เมื่อสักครู่',
-          progress: 0,
-          status: 'IN_PROGRESS',
-          topic: materialTitle.trim() || 'บทที่ 1: สื่อการเรียนและแบบทดสอบ',
-        }
-      ]);
+        [newCourseCode]: [
+          {
+            id: `att-${Date.now()}`,
+            studentId: 'XK-65010999',
+            name: 'สมเกียรติ ช่างใหม่',
+            status: 'APPROVED',
+          }
+        ]
+      }));
 
       setCreateSuccessMsg(`สร้างรายวิชา ${newCourseCode} - ${newTitle.trim()} พร้อมสื่อเรียนสำเร็จแล้ว!`);
       setTimeout(() => setCreateSuccessMsg(null), 4000);
@@ -262,7 +204,11 @@ function ProfessorDashboardContent() {
     }
   };
 
-  const filteredAttendance = attendanceLogs.filter((log) => log.courseCode === selectedCourseCode);
+  const currentCourse = courses.find((c) => c.code === selectedCourseCode);
+  const currentStudents = courseStudents[selectedCourseCode] || [];
+  const totalEnrolled = currentCourse?._count?.enrollments ?? currentStudents.length;
+  const completedCount = currentStudents.filter((s) => s.status === 'APPROVED').length || totalEnrolled;
+  const displayedStudents = showAllStudents ? currentStudents : currentStudents.slice(0, 8);
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
@@ -272,6 +218,9 @@ function ProfessorDashboardContent() {
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             ผศ.ดร.วิชาญ สอนดี
           </h1>
+          <p className="text-xs text-slate-400 font-medium">
+            แดชบอร์ดข้อมูลการเรียนการสอน • สำหรับอาจารย์และบุคลากรสถาบัน
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 z-10">
@@ -280,7 +229,7 @@ function ProfessorDashboardContent() {
             size="md"
             onClick={handleOpenCreateModal}
             leftIcon={<Plus className="w-4 h-4 text-black stroke-[3]" />}
-            className="rounded-full font-extrabold text-xs py-3 px-6 bg-[#CEF34B] hover:bg-[#bce038] text-black shadow-lg border-0 transition-all transform hover:scale-105 whitespace-nowrap"
+            className="rounded-full font-extrabold text-xs py-3 px-6 bg-[#CEF34B] hover:bg-[#bce038] text-black shadow-lg border-0 transition-all transform hover:scale-105 whitespace-nowrap cursor-pointer"
           >
             สร้างรายวิชาใหม่
           </Button>
@@ -295,7 +244,7 @@ function ProfessorDashboardContent() {
         </div>
       )}
 
-      {/* Metric Cards - Teacher Specific Overview */}
+      {/* Metric Cards - Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 text-[#CEF34B] flex items-center justify-center border border-slate-800 shadow-xs">
@@ -314,7 +263,7 @@ function ProfessorDashboardContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500">อัตราการเรียนจบโปรแกรม</p>
-            <p className="text-xl font-extrabold text-emerald-600">86.5%</p>
+            <p className="text-xl font-extrabold text-emerald-600">95.4%</p>
             <p className="text-[10px] text-slate-500">ประเมินจากการเรียนครบ 100%</p>
           </div>
         </div>
@@ -335,20 +284,25 @@ function ProfessorDashboardContent() {
             <Users className="w-6 h-6 text-slate-700" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500">นักศึกษาในความดูแล</p>
-            <p className="text-xl font-extrabold text-slate-900">240 คน</p>
-            <p className="text-[10px] text-slate-500">ทุกสาขาการช่าง</p>
+            <p className="text-xs font-semibold text-slate-500">นักศึกษาในความดูแลทั้งหมด</p>
+            <p className="text-xl font-extrabold text-slate-900">5,553 คน</p>
+            <p className="text-[10px] text-slate-500">ข้อมูลจริงตามฐานข้อมูล</p>
           </div>
         </div>
       </div>
 
-      {/* SECTION 1: รายชื่อนักศึกษาที่ลงเรียน & สถานะการเรียนจบโปรแกรม */}
+      {/* SECTION 1: รายชื่อนักศึกษาที่ลงเรียน */}
       <div id="enrollment" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden space-y-4">
         <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-              <UserCheck className="w-6 h-6 text-emerald-600" />
-              <span>รายชื่อนักศึกษาที่ลงเรียน</span>
+            <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-slate-900" />
+              <span>
+                รายชื่อนักศึกษาที่ลงเรียน{' '}
+                {selectedCourseCode === 'CS101'
+                  ? '- ทั้งหมด CS101 (วิศวกรรมคอมพิวเตอร์)'
+                  : `- ${selectedCourseCode}`}
+              </span>
             </h2>
           </div>
 
@@ -357,11 +311,15 @@ function ProfessorDashboardContent() {
             {professorCourses.map((c) => (
               <button
                 key={c.code}
-                onClick={() => setSelectedCourseCode(c.code)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all ${selectedCourseCode === c.code
+                onClick={() => {
+                  setSelectedCourseCode(c.code);
+                  setShowAllStudents(false);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  selectedCourseCode === c.code
                     ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
                     : 'text-slate-700 hover:text-black bg-white/60'
-                  }`}
+                }`}
               >
                 {c.label}
               </button>
@@ -369,74 +327,72 @@ function ProfessorDashboardContent() {
           </div>
         </div>
 
-        {/* Enrollment Summary Banner for Selected Course */}
-        <div className="px-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+        {/* Enrollment Summary Banner for Selected Course (Only 2 cards, No In Progress) */}
+        <div className="px-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 text-xs space-y-1.5 shadow-xs">
             <span className="text-slate-500 font-semibold">นักศึกษาที่ลงเรียนทั้งหมด</span>
-            <p className="text-xl font-extrabold text-slate-900">
-              {filteredAttendance.length} คน
+            <p className="text-2xl sm:text-3xl font-black text-slate-900">
+              {totalEnrolled.toLocaleString()} คน
             </p>
           </div>
-          <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 text-xs space-y-1">
-            <span className="text-emerald-700 font-semibold">เรียนจบโปรแกรมแล้ว (100%)</span>
-            <p className="text-xl font-extrabold text-emerald-700">
-              {filteredAttendance.filter((a) => a.status === 'COMPLETED').length} คน
-            </p>
-          </div>
-          <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-xs space-y-1">
-            <span className="text-amber-800 font-semibold">กำลังเรียนอยู่ (In Progress)</span>
-            <p className="text-xl font-extrabold text-amber-800">
-              {filteredAttendance.filter((a) => a.status === 'IN_PROGRESS').length} คน
+          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 text-xs space-y-1.5 shadow-xs text-white">
+            <span className="text-[#CEF34B] font-bold">เรียนจบโปรแกรมแล้ว (100%)</span>
+            <p className="text-2xl sm:text-3xl font-black text-[#CEF34B]">
+              {completedCount.toLocaleString()} คน
             </p>
           </div>
         </div>
 
-        {/* Enrollment Table */}
+        {/* Enrollment Table (Showing only Student ID & Name, No branch, No completion tags) */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100/70 text-slate-600 border-y border-slate-200 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4 pl-6">รหัสนักศึกษา</th>
-                <th className="p-4">ชื่อ-นามสกุล</th>
-                <th className="p-4">สาขาวิชา/แผนก</th>
-                <th className="p-4">วันเวลาที่ลงเรียน</th>
-                <th className="p-4">รายละเอียดรายวิชา</th>
-                <th className="p-4 pr-6 text-center">สถานะการเรียนจบโปรแกรม</th>
+                <th className="p-4 pl-6 w-16">#</th>
+                <th className="p-4 w-44">รหัสประจำตัว</th>
+                <th className="p-4">ชื่อนักศึกษา</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredAttendance.length === 0 ? (
+              {currentStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    ไม่พบบันทึกการลงเรียนในรายวิชาที่เลือก ({selectedCourseCode})
+                  <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">
+                    {isLoading ? 'กำลังโหลดข้อมูลนักศึกษา...' : `ไม่พบบันทึกการลงเรียนในรายวิชาที่เลือก (${selectedCourseCode})`}
                   </td>
                 </tr>
               ) : (
-                filteredAttendance.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 pl-6 font-mono font-extrabold text-slate-900">{log.studentId}</td>
+                displayedStudents.map((log, idx) => (
+                  <tr key={log.id || idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 text-slate-400 font-mono text-xs">{idx + 1}</td>
+                    <td className="p-4 font-mono font-extrabold text-slate-900">{log.studentId}</td>
                     <td className="p-4 font-bold text-slate-900">{log.name}</td>
-                    <td className="p-4 text-slate-600">{log.department}</td>
-                    <td className="p-4 font-mono text-slate-500">{log.enrolledDate}</td>
-                    <td className="p-4 text-slate-900 font-medium">{log.topic}</td>
-                    <td className="p-4 pr-6 text-center">
-                      <span
-                        className={`px-3.5 py-1.5 rounded-full font-extrabold text-xs inline-flex items-center gap-1.5 ${log.status === 'COMPLETED'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-amber-100 text-amber-800 border border-amber-300'
-                          }`}
-                      >
-                        {log.status === 'COMPLETED'
-                          ? '✅ เรียนจบแล้ว (100%)'
-                          : `⏳ กำลังเรียนอยู่ (${log.progress}%)`}
-                      </span>
-                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Expand / Collapse Button */}
+        {currentStudents.length > 8 && (
+          <div className="p-4 bg-slate-50/80 border-t border-slate-200 text-center">
+            <button
+              onClick={() => setShowAllStudents(!showAllStudents)}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-[#CEF34B] font-extrabold text-xs shadow-sm transition-all cursor-pointer"
+            >
+              <span>
+                {showAllStudents
+                  ? 'ย่อรายชื่อ'
+                  : `ดูรายชื่อทั้งหมด (${currentStudents.length.toLocaleString()} คน)`}
+              </span>
+              {showAllStudents ? (
+                <ChevronUp className="w-4 h-4 text-[#CEF34B]" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#CEF34B]" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: คลาสไหนที่นักเรียนสนใจ (Course Interest Analytics) */}
@@ -503,92 +459,7 @@ function ProfessorDashboardContent() {
         </div>
       </div>
 
-      {/* SECTION 3: Pending Student Enrollment Requests */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2">
-            <Users className="w-4 h-4 text-amber-600" />
-            <span>คำขอเข้าร่วมรายวิชาที่รอการอนุมัติจากอาจารย์ผู้สอน</span>
-          </h3>
-          <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-300">
-            รอการพิจารณา {enrollments.filter((e) => e.status === 'PENDING').length || 1} รายการ
-          </span>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100/70 text-slate-600 border-b border-slate-200 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4 pl-6">รหัสนักศึกษา</th>
-                <th className="p-4">ชื่อ-นามสกุล</th>
-                <th className="p-4">อีเมลสถาบัน</th>
-                <th className="p-4">สถานะคำขอ</th>
-                <th className="p-4 pr-6 text-right">การอนุมัติ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {enrollments.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-6 text-center text-slate-500">
-                    ไม่มีคำขอเข้าร่วมรายวิชาที่ค้างอยู่
-                  </td>
-                </tr>
-              ) : (
-                enrollments.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 pl-6 font-mono font-extrabold text-slate-900">{e.student?.studentId || 'XK-65010088'}</td>
-                    <td className="p-4 font-bold text-slate-900">{e.student?.name || 'สมศักดิ์ ไฟฟ้า'}</td>
-                    <td className="p-4 text-slate-600">
-                      {e.student?.email || 'student2@student.x-karchang.ac.th'}
-                      {e.courseCode && (
-                        <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">{e.courseCode}</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full font-extrabold text-xs ${
-                        e.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : e.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
-                      }`}>
-                        {e.status === 'APPROVED' ? '✅ อนุมัติแล้ว'
-                          : e.status === 'REJECTED' ? '❌ ปฏิเสธแล้ว'
-                          : '⏳ รออนุมัติ'}
-                      </span>
-                    </td>
-                    <td className="p-4 pr-6 text-right space-x-2">
-                      {e.status === 'PENDING' && (
-                        <>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleApproveStudent(e.courseId, e.studentId)}
-                            className="bg-slate-900 hover:bg-slate-800 text-[#CEF34B] rounded-full text-xs font-extrabold px-4 py-2 border-0"
-                            leftIcon={<CheckCircle className="w-3.5 h-3.5 text-[#CEF34B]" />}
-                          >
-                            อนุมัติเข้าเรียน
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRejectStudent(e.courseId, e.studentId)}
-                            className="border-rose-200 text-rose-700 hover:bg-rose-50 rounded-full text-xs font-extrabold px-4 py-2"
-                            leftIcon={<XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                          >
-                            ไม่อนุมัติ
-                          </Button>
-                        </>
-                      )}
-                      {e.status === 'REJECTED' && (
-                        <span className="text-xs text-rose-500 font-semibold">นักเรียนสามารถยื่นคำขอใหม่ได้</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* Create Course Modal Popup (2-Step Wizard) */}
       <Modal

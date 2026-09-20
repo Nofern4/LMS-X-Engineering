@@ -73,11 +73,8 @@ export default function CourseApproverDashboard() {
       <div className="p-6 sm:p-8 bg-black text-white rounded-3xl border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="space-y-2.5 relative z-10 max-w-3xl">
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            พิจารณาอนุมัติรายวิชาและสื่อการสอน
+            อนุมัติรายวิชาและสื่อการสอน
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-            ตรวจสอบความถูกต้องของโครงสร้างรายวิชาและสื่อการเรียนรู้จากคณาจารย์ ก่อนเปิดให้ลงทะเบียนและเผยแพร่ในระบบ
-          </p>
         </div>
 
         {/* Ambient glow decoration */}

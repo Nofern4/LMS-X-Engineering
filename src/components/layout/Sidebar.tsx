@@ -64,9 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
         ];
       case 'PROFESSOR':
         return [
-          { label: 'หน้าเว็บจัดการอาจารย์', href: '/professor', icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: 'รายงานใครเข้าเรียน', href: '/professor#attendance', icon: <UserCheck className="w-5 h-5" /> },
-          { label: 'รายงานคลาสที่นักเรียนสนใจ', href: '/professor#interest', icon: <BarChart3 className="w-5 h-5" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: 'สร้างรายวิชาใหม่', href: '/professor/courses/create', icon: <BookOpen className="w-5 h-5" /> },
           { label: 'คลังรายวิชาทั้งหมด', href: '/courses', icon: <FolderOpen className="w-5 h-5" /> },
         ];
@@ -76,18 +74,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
         return [
           { label: 'ศูนย์อนุมัติ (Approver Portal)', href: '/course-approver', icon: <ShieldCheck className="w-5 h-5" /> },
           { label: 'อนุมัติสื่อการเรียนรู้', href: '/content-approver', icon: <FileCheck className="w-5 h-5" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <LayoutDashboard className="w-5 h-5" /> },
         ];
       case 'DIRECTOR':
         return [
           { label: 'ผู้บริหาร ผอ. (Executive Portal)', href: '/director', icon: <Eye className="w-5 h-5" /> },
           { label: 'ภาพรวมรายวิชา (Read-Only)', href: '/courses', icon: <BookOpen className="w-5 h-5" /> },
           { label: 'สถิติสถาบัน & การเข้าเรียน', href: '/director#reports', icon: <BarChart3 className="w-5 h-5" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <LayoutDashboard className="w-5 h-5" /> },
         ];
       case 'REGISTRAR':
         return [
           { label: 'ศูนย์งานนายทะเบียน', href: '/registrar', icon: <UserCheck className="w-5 h-5" /> },
           { label: 'จัดการสิทธิ์ & แต่งตั้งอาจารย์', href: '/registrar/users', icon: <ShieldCheck className="w-5 h-5" /> },
           { label: 'คลังรายวิชาทั้งหมด', href: '/courses', icon: <BookOpen className="w-5 h-5" /> },
+          { label: 'อื่นๆ เพื่อดู แดชบอร์ด', href: '/professor', icon: <LayoutDashboard className="w-5 h-5" /> },
         ];
       default:
         return [
