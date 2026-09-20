@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, Settings, Captions } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, Settings, Captions, ExternalLink, Download, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 
 interface VideoPlayerProps {
@@ -9,6 +9,19 @@ interface VideoPlayerProps {
   poster?: string;
   title?: string;
   className?: string;
+}
+
+function getYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regExp);
+  return match ? match[1] : null;
+}
+
+function getGoogleDriveId(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -26,13 +39,46 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Check for external platform embeds
+  const youtubeId = getYouTubeId(src);
+  const driveId = getGoogleDriveId(src);
+
+  if (youtubeId) {
+    return (
+      <div className={`relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 aspect-video ${className}`}>
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&modestbranding=1`}
+          title={title || 'วิดีโอการเรียนการสอน (YouTube)'}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          className="w-full h-full border-0 rounded-3xl"
+        />
+      </div>
+    );
+  }
+
+  if (driveId) {
+    return (
+      <div className={`relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 aspect-video ${className}`}>
+        <iframe
+          src={`https://drive.google.com/file/d/${driveId}/preview`}
+          title={title || 'วิดีโอการเรียนการสอน (Google Drive)'}
+          allow="autoplay; fullscreen"
+          allowFullScreen
+          className="w-full h-full border-0 rounded-3xl"
+        />
+      </div>
+    );
+  }
 
   const togglePlay = () => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
       } else {
-        videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
       setIsPlaying(!isPlaying);
     }
@@ -47,6 +93,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      setHasError(false);
     }
   };
 
@@ -101,24 +148,59 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  if (hasError) {
+    return (
+      <div className={`relative bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[360px] aspect-video ${className}`}>
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
+          <Play className="w-8 h-8 ml-1" />
+        </div>
+        <h3 className="text-lg font-bold text-white mb-2">คลิปสื่อการเรียนการสอน</h3>
+        <p className="text-xs text-slate-400 max-w-md mx-auto mb-6 leading-relaxed">
+          หากวิดีโอนี้อยู่ในรูปแบบไฟล์พิเศษหรือถูกแปลง Codec สามารถกดเปิดรับชมผ่านแท็บใหม่ หรือดาวน์โหลดเพื่อเปิดรับชมด้วยโปรแกรมบนเครื่องได้ทันที
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <span>เปิดรับชมในแท็บใหม่</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          <a
+            href={src}
+            download
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 shadow-md transition-all cursor-pointer"
+          >
+            <span>ดาวน์โหลดไฟล์วิดีโอ</span>
+            <Download className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`relative bg-[#14110f] rounded-3xl overflow-hidden shadow-warm-xl border border-[#3d2c20] group ${className}`}>
+    <div className={`relative bg-[#0f172a] rounded-3xl overflow-hidden shadow-xl border border-slate-800 group ${className}`}>
       <video
         ref={videoRef}
         src={src}
         poster={poster}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onError={() => setHasError(true)}
         onClick={togglePlay}
-        preload="none"
-        className="w-full h-auto aspect-video cursor-pointer"
+        preload="metadata"
+        playsInline
+        className="w-full h-auto aspect-video cursor-pointer bg-black"
       >
         <track kind="captions" label="Thai Subtitles" srcLang="th" default={captionsEnabled} />
       </video>
 
       {/* Overlay Title */}
       {title && (
-        <div className="absolute top-0 left-0 right-0 p-5 bg-gradient-to-b from-black/80 via-black/40 to-transparent text-[#f9f6f0] font-serif-luxury text-base font-bold pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-0 left-0 right-0 p-5 bg-gradient-to-b from-black/80 via-black/40 to-transparent text-white text-sm sm:text-base font-bold pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
           {title}
         </div>
       )}
@@ -127,16 +209,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {!isPlaying && (
         <div
           onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+          className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] cursor-pointer"
         >
-          <div className="w-18 h-18 p-4 rounded-full bg-[#3d2c20]/90 text-[#f9f6f0] flex items-center justify-center shadow-warm-xl border border-[#c69b76]/50 hover:scale-110 transition-transform">
-            <Play className="w-9 h-9 fill-[#c69b76] text-[#c69b76] ml-1" />
+          <div className="w-16 h-16 rounded-full bg-slate-900/90 text-white flex items-center justify-center shadow-2xl border border-white/20 hover:scale-110 transition-transform">
+            <Play className="w-8 h-8 fill-[#CEF34B] text-[#CEF34B] ml-1" />
           </div>
         </div>
       )}
 
       {/* Video Control Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 flex flex-col gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-4 flex flex-col gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {/* Progress Bar */}
         <input
           type="range"
@@ -144,16 +226,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           max={duration || 100}
           value={currentTime}
           onChange={handleSeek}
-          className="w-full h-1.5 bg-[#3d2c20] accent-[#c69b76] rounded-lg cursor-pointer"
+          className="w-full h-1.5 bg-slate-700 accent-[#CEF34B] rounded-lg cursor-pointer"
         />
 
-        <div className="flex items-center justify-between text-[#f9f6f0] text-xs">
+        <div className="flex items-center justify-between text-white text-xs">
           <div className="flex items-center gap-3">
-            <button onClick={togglePlay} className="hover:text-[#c69b76] transition-colors">
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current text-[#c69b76]" />}
+            <button onClick={togglePlay} className="hover:text-[#CEF34B] transition-colors cursor-pointer">
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current text-[#CEF34B]" />}
             </button>
 
-            <button onClick={toggleMute} className="hover:text-[#c69b76] transition-colors">
+            <button onClick={toggleMute} className="hover:text-[#CEF34B] transition-colors cursor-pointer">
               {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-rose-400" /> : <Volume2 className="w-5 h-5" />}
             </button>
 
@@ -164,10 +246,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               step="0.1"
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-16 h-1 bg-[#3d2c20] accent-[#c69b76] rounded cursor-pointer hidden sm:block"
+              className="w-16 h-1 bg-slate-700 accent-[#CEF34B] rounded cursor-pointer hidden sm:block"
             />
 
-            <span className="font-mono text-[11px] text-[#b1a8a2]">
+            <span className="font-mono text-[11px] text-slate-300">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
@@ -175,7 +257,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <div className="flex items-center gap-3 relative">
             <button
               onClick={() => setCaptionsEnabled(!captionsEnabled)}
-              className={`hover:text-[#c69b76] transition-colors ${captionsEnabled ? 'text-[#c69b76]' : 'text-[#8e827b]'}`}
+              className={`hover:text-[#CEF34B] transition-colors cursor-pointer ${captionsEnabled ? 'text-[#CEF34B]' : 'text-slate-400'}`}
               title="Captions / Subtitles"
             >
               <Captions className="w-5 h-5" />
@@ -185,18 +267,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                className="font-semibold text-xs px-2.5 py-1 bg-[#2a2420] hover:bg-[#3d2c20] rounded-full border border-[#5c4533] text-[#f9f6f0]"
+                className="font-semibold text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-full border border-slate-700 text-white cursor-pointer"
               >
                 {playbackSpeed}x
               </button>
 
               {showSpeedMenu && (
-                <div className="absolute bottom-9 right-0 bg-[#211710] border border-[#5c4533] rounded-2xl shadow-warm-xl py-1.5 w-20 flex flex-col text-center z-20">
+                <div className="absolute bottom-9 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl py-1.5 w-20 flex flex-col text-center z-20">
                   {[0.5, 1, 1.25, 1.5, 2].map((s) => (
                     <button
                       key={s}
                       onClick={() => changeSpeed(s)}
-                      className={`px-3 py-1.5 text-xs hover:bg-[#3d2c20] ${playbackSpeed === s ? 'text-[#c69b76] font-bold' : 'text-[#f9f6f0]'}`}
+                      className={`px-3 py-1.5 text-xs hover:bg-slate-800 cursor-pointer ${playbackSpeed === s ? 'text-[#CEF34B] font-bold' : 'text-white'}`}
                     >
                       {s}x
                     </button>
@@ -205,7 +287,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               )}
             </div>
 
-            <button onClick={toggleFullscreen} className="hover:text-[#c69b76] transition-colors">
+            <button onClick={toggleFullscreen} className="hover:text-[#CEF34B] transition-colors cursor-pointer">
               <Maximize className="w-5 h-5" />
             </button>
           </div>

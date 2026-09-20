@@ -222,14 +222,20 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
     id === 'course-6' ? 'AI401' : ''
   );
 
+  const isSeedCourse = ['CS101', 'ME201', 'EE305', 'AUTO101', 'SE302', 'AI401'].includes(courseCode) ||
+    ['course-1', 'course-2', 'course-3', 'course-4', 'course-5', 'course-6'].includes(id);
+
   // Instructor curriculum rules:
   // 1. ME201: ONLY documents, NO videos, NO quiz
   // 2. SE302: Videos + Quiz, NO documents
   // 3. AUTO101: Videos + Documents, NO quiz
   // 4. CS101, EE305, AI401: Full package
-  const hasVideos = courseCode !== 'ME201' && id !== 'course-2';
-  const hasDocuments = courseCode !== 'SE302' && id !== 'course-5';
-  const hasQuiz = courseCode !== 'AUTO101' && courseCode !== 'ME201' && id !== 'course-4' && id !== 'course-2';
+  // 5. Custom / user-created courses: hasQuiz ONLY if explicitly ticked (course.hasQuiz or course.quizUrl)
+  const hasVideos = isSeedCourse ? (courseCode !== 'ME201' && id !== 'course-2') : true;
+  const hasDocuments = isSeedCourse ? (courseCode !== 'SE302' && id !== 'course-5') : true;
+  const hasQuiz = isSeedCourse
+    ? (courseCode !== 'AUTO101' && courseCode !== 'ME201' && id !== 'course-4' && id !== 'course-2')
+    : Boolean(course?.hasQuiz || course?.quizUrl);
 
   // null = ยังไม่รู้ (กำลังโหลด), true = เข้าได้, false = ปิดและยังไม่ได้รับอนุมัติ
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
@@ -242,7 +248,8 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
   const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
 
-  const currentQuizQuestions: QuizQuestion[] = COURSE_QUIZZES[courseCode] || COURSE_QUIZZES['CS101'];
+  // For seed courses use seed questions, but NEVER force CS101 on custom courses without quizzes
+  const currentQuizQuestions: QuizQuestion[] = COURSE_QUIZZES[courseCode] || [];
 
   useEffect(() => {
     fetch(`/api/courses/${id}`)
@@ -537,7 +544,15 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
             ) : activeMaterial?.type === 'VIDEO' && hasVideos ? (
               /* Video Player View */
               <VideoPlayer
-                src={`/api/materials/${activeMaterial.id}/stream`}
+                src={
+                  activeMaterial?.filePath &&
+                  (activeMaterial.filePath.startsWith('http://') ||
+                    activeMaterial.filePath.startsWith('https://') ||
+                    activeMaterial.filePath.startsWith('blob:') ||
+                    activeMaterial.filePath.startsWith('data:'))
+                    ? activeMaterial.filePath
+                    : `/api/materials/${activeMaterial.id}/stream`
+                }
                 title={activeMaterial.title}
                 poster="/assets/poster_placeholder.png"
               />
@@ -587,7 +602,9 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
               <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100">
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-slate-900">{activeMaterial?.title}</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">{activeMaterial?.description}</p>
+                  {activeMaterial?.description && (
+                    <p className="text-xs text-slate-500 mt-0.5">{activeMaterial.description}</p>
+                  )}
                 </div>
 
                 <div>
@@ -673,21 +690,32 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
             {/* Tab 1: Overview */}
             {activeTab === 'overview' && (
               <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <h4 className="font-bold text-slate-900 text-xs">วัตถุประสงค์การเรียนรู้ (Learning Objectives)</h4>
-                  <ul className="list-disc list-inside space-y-1 text-slate-600">
-                    <li>เข้าใจหลักการพื้นฐานและมาตรฐานทางวิศวกรรมช่างกล</li>
-                    <li>สามารถประยุกต์ใช้ความรู้ผ่านสื่อการสอนและเอกสารคู่มือประกอบบทเรียน</li>
-                    {hasQuiz ? (
-                      <li>ทำแบบทดสอบหลังเรียนเพื่อวัดระดับความเข้าใจและบันทึกคะแนนสะสม</li>
-                    ) : (
-                      <li>ศึกษาและฝึกปฏิบัติด้วยตนเองผ่านเอกสารประกอบการสอน</li>
-                    )}
-                  </ul>
-                </div>
-                <p>
-                  บทเรียนนี้ออกแบบสำหรับนักศึกษา มหาวิทยาลัย Xการช่าง สามารถเรียนทบทวนได้ตลอดเวลาโดยไม่มีจำกัดจำนวนครั้ง
-                </p>
+                {course?.description?.trim() ? (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <h4 className="font-bold text-slate-900 text-xs">คำอธิบายและรายละเอียดรายวิชา</h4>
+                    <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{course.description}</p>
+                  </div>
+                ) : isSeedCourse ? (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <h4 className="font-bold text-slate-900 text-xs">วัตถุประสงค์การเรียนรู้ (Learning Objectives)</h4>
+                    <ul className="list-disc list-inside space-y-1 text-slate-600">
+                      <li>เข้าใจหลักการพื้นฐานและมาตรฐานทางวิศวกรรมช่างกล</li>
+                      <li>สามารถประยุกต์ใช้ความรู้ผ่านสื่อการสอนและเอกสารคู่มือประกอบบทเรียน</li>
+                      {hasQuiz && <li>ทำแบบทดสอบหลังเรียนเพื่อวัดระดับความเข้าใจและบันทึกคะแนนสะสม</li>}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5 text-xs text-slate-500">
+                    <Info className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                    <p className="font-bold text-slate-700">ไม่มีรายละเอียดเพิ่มเติมสำหรับบทเรียนนี้</p>
+                    <p className="text-[11px] text-slate-400">อาจารย์ผู้สอนไม่ได้ระบุรายละเอียดเพิ่มเติม สามารถศึกษาเนื้อหาผ่านสื่อการเรียนได้ทันที</p>
+                  </div>
+                )}
+                {isSeedCourse && (
+                  <p>
+                    บทเรียนนี้ออกแบบสำหรับนักศึกษา มหาวิทยาลัย Xการช่าง สามารถเรียนทบทวนได้ตลอดเวลาโดยไม่มีจำกัดจำนวนครั้ง
+                  </p>
+                )}
               </div>
             )}
 
@@ -733,7 +761,7 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
             {activeTab === 'quiz' && hasQuiz && (
               <div className="space-y-6">
                 {/* Result Card if already submitted */}
-                {isQuizSubmitted && (
+                {isQuizSubmitted && currentQuizQuestions.length > 0 && (
                   <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
@@ -760,109 +788,111 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
 
-                {/* Interactive Questions List */}
-                <div className="space-y-4">
-                  {currentQuizQuestions.map((q, qIdx) => {
-                    const selectedOpt = userAnswers[qIdx];
-                    const isAnswered = selectedOpt !== undefined;
-                    const isCorrect = isQuizSubmitted && selectedOpt === q.correctAnswer;
-                    const isWrong = isQuizSubmitted && selectedOpt !== q.correctAnswer;
+                {/* Interactive Questions List (Only if questions exist) */}
+                {currentQuizQuestions.length > 0 && (
+                  <div className="space-y-4">
+                    {currentQuizQuestions.map((q, qIdx) => {
+                      const selectedOpt = userAnswers[qIdx];
+                      const isAnswered = selectedOpt !== undefined;
+                      const isCorrect = isQuizSubmitted && selectedOpt === q.correctAnswer;
+                      const isWrong = isQuizSubmitted && selectedOpt !== q.correctAnswer;
 
-                    return (
-                      <div
-                        key={q.id}
-                        className={`p-5 rounded-2xl border transition-all space-y-3 text-xs ${
-                          isQuizSubmitted
-                            ? isCorrect
-                              ? 'bg-emerald-50/50 border-emerald-300'
-                              : 'bg-rose-50/40 border-rose-300'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2.5">
-                            <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-[#CEF34B] font-bold font-mono text-[10px] flex-shrink-0">
-                              ข้อ {qIdx + 1}/{currentQuizQuestions.length}
-                            </span>
-                            <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">
-                              {q.question}
-                            </h4>
+                      return (
+                        <div
+                          key={q.id}
+                          className={`p-5 rounded-2xl border transition-all space-y-3 text-xs ${
+                            isQuizSubmitted
+                              ? isCorrect
+                                ? 'bg-emerald-50/50 border-emerald-300'
+                                : 'bg-rose-50/40 border-rose-300'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5">
+                              <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-[#CEF34B] font-bold font-mono text-[10px] flex-shrink-0">
+                                ข้อ {qIdx + 1}/{currentQuizQuestions.length}
+                              </span>
+                              <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">
+                                {q.question}
+                              </h4>
+                            </div>
+
+                            {isQuizSubmitted && (
+                              <span className={`text-xs font-bold flex items-center gap-1 flex-shrink-0 ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {isCorrect ? (
+                                  <>
+                                    <CheckCircle className="w-4 h-4" />
+                                    <span>ถูกต้อง (+1)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="w-4 h-4" />
+                                    <span>ไม่ถูกต้อง (0)</span>
+                                  </>
+                                )}
+                              </span>
+                            )}
                           </div>
 
-                          {isQuizSubmitted && (
-                            <span className={`text-xs font-bold flex items-center gap-1 flex-shrink-0 ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {isCorrect ? (
-                                <>
-                                  <CheckCircle className="w-4 h-4" />
-                                  <span>ถูกต้อง (+1)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle className="w-4 h-4" />
-                                  <span>ไม่ถูกต้อง (0)</span>
-                                </>
-                              )}
-                            </span>
-                          )}
-                        </div>
+                          {/* 4 Multiple Choice Options */}
+                          <div className="space-y-2 pt-1">
+                            {q.options.map((opt, optIdx) => {
+                              const isChosen = selectedOpt === optIdx;
+                              const isRightAnswer = isQuizSubmitted && optIdx === q.correctAnswer;
+                              const isChosenWrong = isQuizSubmitted && isChosen && !isRightAnswer;
 
-                        {/* 4 Multiple Choice Options */}
-                        <div className="space-y-2 pt-1">
-                          {q.options.map((opt, optIdx) => {
-                            const isChosen = selectedOpt === optIdx;
-                            const isRightAnswer = isQuizSubmitted && optIdx === q.correctAnswer;
-                            const isChosenWrong = isQuizSubmitted && isChosen && !isRightAnswer;
-
-                            return (
-                              <div
-                                key={optIdx}
-                                onClick={() => handleOptionSelect(qIdx, optIdx)}
-                                className={`p-3 rounded-xl border flex items-center gap-3 transition-all cursor-pointer select-none ${
-                                  isRightAnswer
-                                    ? 'bg-emerald-100/80 border-emerald-400 font-bold text-emerald-950 shadow-xs'
-                                    : isChosenWrong
-                                    ? 'bg-rose-100/80 border-rose-400 font-bold text-rose-950'
-                                    : isChosen
-                                    ? 'bg-slate-900 text-white font-bold border-slate-900 shadow-xs'
-                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
-                                }`}
-                              >
+                              return (
                                 <div
-                                  className={`w-5 h-5 rounded-full border flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${
+                                  key={optIdx}
+                                  onClick={() => handleOptionSelect(qIdx, optIdx)}
+                                  className={`p-3 rounded-xl border flex items-center gap-3 transition-all cursor-pointer select-none ${
                                     isRightAnswer
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      ? 'bg-emerald-100/80 border-emerald-400 font-bold text-emerald-950 shadow-xs'
                                       : isChosenWrong
-                                      ? 'bg-rose-600 text-white border-rose-600'
+                                      ? 'bg-rose-100/80 border-rose-400 font-bold text-rose-950'
                                       : isChosen
-                                      ? 'bg-[#CEF34B] text-black border-[#CEF34B]'
-                                      : 'border-slate-300 text-slate-500'
+                                      ? 'bg-slate-900 text-white font-bold border-slate-900 shadow-xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                                   }`}
                                 >
-                                  {String.fromCharCode(65 + optIdx)}
+                                  <div
+                                    className={`w-5 h-5 rounded-full border flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${
+                                      isRightAnswer
+                                        ? 'bg-emerald-600 text-white border-emerald-600'
+                                        : isChosenWrong
+                                        ? 'bg-rose-600 text-white border-rose-600'
+                                        : isChosen
+                                        ? 'bg-[#CEF34B] text-black border-[#CEF34B]'
+                                        : 'border-slate-300 text-slate-500'
+                                    }`}
+                                  >
+                                    {String.fromCharCode(65 + optIdx)}
+                                  </div>
+                                  <span className="flex-1 leading-relaxed">{opt}</span>
                                 </div>
-                                <span className="flex-1 leading-relaxed">{opt}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Explanation after submission */}
-                        {isQuizSubmitted && (
-                          <div className="p-3 rounded-xl bg-white/90 border border-slate-200 text-[11px] text-slate-600 space-y-1 mt-2">
-                            <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                              <span>คำอธิบายเฉลย:</span>
-                            </p>
-                            <p className="text-slate-600 leading-relaxed pl-5">{q.explanation}</p>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+
+                          {/* Explanation after submission */}
+                          {isQuizSubmitted && (
+                            <div className="p-3 rounded-xl bg-white/90 border border-slate-200 text-[11px] text-slate-600 space-y-1 mt-2">
+                              <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                <span>คำอธิบายเฉลย:</span>
+                              </p>
+                              <p className="text-slate-600 leading-relaxed pl-5">{q.explanation}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Quiz Submit Button */}
-                {!isQuizSubmitted ? (
+                {!isQuizSubmitted && currentQuizQuestions.length > 0 ? (
                   <div className="flex items-center justify-between gap-4 pt-2">
                     <p className="text-xs text-slate-500">
                       ตอบแล้ว {Object.keys(userAnswers).length} จาก {currentQuizQuestions.length} ข้อ
@@ -879,19 +909,21 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                   </div>
                 ) : null}
 
-                {/* Google Forms Alternative Option */}
+                {/* Google Forms Option (if quizUrl provided or no interactive questions) */}
                 <div className="p-5 rounded-3xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-700">
                   <div className="space-y-1">
                     <h4 className="font-bold text-xs flex items-center gap-2 text-slate-900">
                       <HelpCircle className="w-4 h-4 text-amber-600" />
-                      <span>ทำแบบทดสอบฉบับทางการผ่าน Google Forms (Google Forms Quiz)</span>
+                      <span>แบบทดสอบหลังเรียนผ่าน Google Forms (Google Forms Quiz)</span>
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      สำหรับผู้เรียนที่ต้องการส่งผลการประเมินเข้าสู่ระบบประมวลผลกลางของสถาบันผ่าน Google Forms
+                      {course?.quizUrl
+                        ? 'เข้าทำแบบทดสอบที่อาจารย์ผู้สอนกำหนดไว้สำหรับรายวิชานี้ผ่าน Google Forms'
+                        : 'สำหรับผู้เรียนที่ต้องการส่งผลการประเมินเข้าสู่ระบบประมวลผลกลางของสถาบันผ่าน Google Forms'}
                     </p>
                   </div>
                   <a
-                    href="https://forms.google.com"
+                    href={course?.quizUrl || 'https://forms.google.com'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-[#CEF34B] font-bold text-xs shadow-xs transition-all self-start sm:self-auto flex-shrink-0 cursor-pointer"

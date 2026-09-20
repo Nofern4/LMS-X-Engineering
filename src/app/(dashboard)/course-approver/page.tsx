@@ -66,15 +66,13 @@ export default function CourseApproverDashboard() {
           <div className="flex items-center gap-2">
             <span className="px-3.5 py-1 rounded-full bg-[#CEF34B]/20 text-[#CEF34B] font-extrabold text-xs border border-[#CEF34B]/40 inline-flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>ศูนย์อนุมัติรายวิชา</span>
+              <span>อนุมัติรายวิชา</span>
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             อนุมัติคำขอเปิดรายวิชา
           </h1>
-          <p className="text-xs text-slate-300">
-            พิจารณาและตรวจสอบมาตรฐานรายวิชาใหม่จากอาจารย์ผู้สอน เพื่อเปิดให้ผู้เรียนเข้าศึกษา
-          </p>
+         
         </div>
 
         {/* Ambient glow decoration */}

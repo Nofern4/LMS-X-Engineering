@@ -92,7 +92,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { user, code, title, description, category, semester, academicYear, accessType, storageLimitGb } = body;
+    const {
+      user,
+      code,
+      title,
+      description,
+      category,
+      semester,
+      academicYear,
+      accessType,
+      storageLimitGb,
+      hasQuiz,
+      quizUrl,
+      initialMaterial,
+    } = body;
 
     // Director Read-Only Check
     if (user && user.roles?.includes('DIRECTOR')) {
@@ -101,8 +114,8 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    if (!code || !title || !description || !user?.id) {
-      return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' }, { status: 400 });
+    if (!code || !title || !user?.id) {
+      return NextResponse.json({ error: 'กรุณากรอกชื่อรายวิชาให้ครบถ้วน' }, { status: 400 });
     }
 
     // Check code uniqueness
@@ -131,16 +144,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลผู้สร้างรายวิชาในระบบ' }, { status: 400 });
     }
 
+    // Prepare initial material if provided
+    const materialData = initialMaterial ? {
+      title: initialMaterial.title?.trim() || `บทที่ 1: แนะนำรายวิชา ${title}`,
+      description: initialMaterial.description?.trim() || '',
+      type: initialMaterial.type || 'VIDEO',
+      filePath: initialMaterial.filePath || initialMaterial.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      fileSize: BigInt(initialMaterial.fileSize || 52428800), // ~50MB default
+      mimeType: initialMaterial.mimeType || (initialMaterial.type === 'VIDEO' ? 'video/mp4' : 'application/pdf'),
+      duration: initialMaterial.duration || 3600,
+      status: 'APPROVED' as const,
+      visibility: true,
+      uploadedById: validUserId,
+    } : null;
+
     const course = await prisma.course.create({
       data: {
         code,
         title,
-        description,
+        description: description?.trim() || '',
         category: category || 'ทั่วไป',
         semester: semester || '1',
         academicYear: academicYear || '2026',
         accessType: accessType || 'APPROVAL_REQUIRED',
         storageLimitGb: parseFloat(storageLimitGb || '10.0'),
+        hasQuiz: Boolean(hasQuiz),
+        quizUrl: quizUrl || null,
         createdById: validUserId,
         status: 'PENDING_APPROVAL',
         instructors: {
@@ -148,6 +177,14 @@ export async function POST(request: Request) {
             instructorId: validUserId,
           },
         },
+        ...(materialData ? {
+          materials: {
+            create: materialData,
+          },
+        } : {}),
+      },
+      include: {
+        materials: true,
       },
     });
 

@@ -281,7 +281,9 @@ function ProfessorDashboardContent() {
   // Step 2 Media & Quiz State
   const [materialType, setMaterialType] = useState<'VIDEO' | 'DOCUMENT'>('VIDEO');
   const [materialTitle, setMaterialTitle] = useState('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [videoLinkUrl, setVideoLinkUrl] = useState('');
   const [hasGoogleFormsQuiz, setHasGoogleFormsQuiz] = useState(false);
   const [googleFormsUrl, setGoogleFormsUrl] = useState('');
 
@@ -297,7 +299,9 @@ function ProfessorDashboardContent() {
     setNewDescription('');
     setMaterialType('VIDEO');
     setMaterialTitle('');
+    setUploadedFile(null);
     setUploadedFileName(null);
+    setVideoLinkUrl('');
     setHasGoogleFormsQuiz(false);
     setGoogleFormsUrl('');
     setIsCreateModalOpen(true);
@@ -388,6 +392,25 @@ function ProfessorDashboardContent() {
         }
       } catch {}
 
+      // Prepare local object URL if file was picked
+      let localBlobUrl = '';
+      if (uploadedFile) {
+        try {
+          localBlobUrl = URL.createObjectURL(uploadedFile);
+        } catch {}
+      }
+
+      const effectiveVideoUrl = videoLinkUrl.trim() || localBlobUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+      const initialMaterialPayload = {
+        title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${newTitle.trim()}`,
+        type: materialType,
+        filePath: effectiveVideoUrl,
+        videoUrl: effectiveVideoUrl,
+        fileSize: uploadedFile ? uploadedFile.size : 52428800,
+        mimeType: uploadedFile ? uploadedFile.type : (materialType === 'VIDEO' ? 'video/mp4' : 'application/pdf'),
+        description: '',
+      };
+
       const res = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -395,12 +418,15 @@ function ProfessorDashboardContent() {
           user: userPayload,
           code: codeToUse,
           title: newTitle.trim(),
-          description: newDescription.trim() || 'รายวิชาใหม่ประจำภาคเรียน',
+          description: newDescription.trim(), // Leave empty if user didn't provide one
           category: newCategory,
           semester: '1',
           academicYear: '2026',
           accessType: newAccessType,
-          storageLimitGb: '1.0',
+          storageLimitGb: '10.0',
+          hasQuiz: hasGoogleFormsQuiz,
+          quizUrl: hasGoogleFormsQuiz ? googleFormsUrl.trim() : null,
+          initialMaterial: initialMaterialPayload,
         }),
       });
 
@@ -414,8 +440,31 @@ function ProfessorDashboardContent() {
       const newCourseCode = codeToUse;
       const savedTitle = newTitle.trim();
       const savedCategory = newCategory;
-      const savedDescription = newDescription.trim() || 'รายวิชาใหม่ประจำภาคเรียน';
+      const savedDescription = newDescription.trim();
       const savedCourseId = data.course?.id || '';
+
+      // If user uploaded a physical file, also upload it to the course's materials API
+      if (uploadedFile && savedCourseId) {
+        try {
+          const fd = new FormData();
+          fd.append('title', materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${savedTitle}`);
+          fd.append('type', materialType);
+          fd.append('userId', userPayload.id || 'prof-1');
+          fd.append('file', uploadedFile);
+          if (videoLinkUrl.trim()) {
+            fd.append('link', videoLinkUrl.trim());
+          }
+          await fetch(`/api/courses/${savedCourseId}/materials`, {
+            method: 'POST',
+            headers: {
+              'x-user': JSON.stringify(userPayload)
+            },
+            body: fd,
+          });
+        } catch (uploadErr) {
+          console.error('Initial material physical upload error:', uploadErr);
+        }
+      }
 
       const newCourseItem = {
         code: newCourseCode,
@@ -427,7 +476,7 @@ function ProfessorDashboardContent() {
       setSelectedCourseCode(newCourseCode);
       setNewlyCreatedCode(newCourseCode);
 
-      // Add a sample video clip for the new course so students see content
+      // Add clip to local state so professor sees it immediately
       const newClip: ProfessorVideoClip = {
         id: `vid-new-${Date.now()}`,
         courseCode: newCourseCode,
@@ -436,9 +485,9 @@ function ProfessorDashboardContent() {
         title: materialTitle.trim() || `บทที่ 1: แนะนำรายวิชา ${savedTitle}`,
         description: savedDescription,
         durationText: '60:00 นาที',
-        fileSizeText: '480 MB',
+        fileSizeText: uploadedFile ? `${(uploadedFile.size / (1024 * 1024)).toFixed(0)} MB` : '480 MB',
         uploadDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        videoUrl: effectiveVideoUrl,
         viewsCount: 0,
       };
       setExtraVideoClips((prev) => [...prev, newClip]);
@@ -472,7 +521,9 @@ function ProfessorDashboardContent() {
       setNewTitle('');
       setNewDescription('');
       setMaterialTitle('');
+      setUploadedFile(null);
       setUploadedFileName(null);
+      setVideoLinkUrl('');
       setHasGoogleFormsQuiz(false);
       setGoogleFormsUrl('');
       setCreateStep(1);
@@ -964,15 +1015,19 @@ function ProfessorDashboardContent() {
                       แนบไฟล์สื่อการสอน ({materialType === 'VIDEO' ? 'Video File' : 'Document File'})
                     </label>
                     <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                      จำกัดขนาดไฟล์ไม่เกิน 1 GB
+                      รองรับทุกไฟล์ ไม่เกิน 1 GB
                     </span>
                   </div>
 
                   <div className="border-2 border-dashed border-slate-200 hover:border-slate-400 bg-slate-50 rounded-2xl p-4 text-center transition-all relative">
                     <input
                       type="file"
-                      accept={materialType === 'VIDEO' ? 'video/*' : '.pdf,.docx,.pptx'}
-                      onChange={(e) => setUploadedFileName(e.target.files?.[0]?.name || null)}
+                      accept={materialType === 'VIDEO' ? 'video/*,.mp4,.webm,.mkv,.mov,.avi,.m4v,.wmv,.flv' : '.pdf,.docx,.pptx'}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setUploadedFile(f);
+                        setUploadedFileName(f?.name || null);
+                      }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <Upload className="w-7 h-7 text-slate-400 mx-auto mb-1.5" />
@@ -988,12 +1043,29 @@ function ProfessorDashboardContent() {
                       <div>
                         <p className="font-bold text-slate-700 text-xs">คลิกหรือลากไฟล์มาวางเพื่ออัพโหลด</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          รองรับไฟล์ {materialType === 'VIDEO' ? 'MP4 / WebM' : 'PDF / DOCX'} (สูงสุดไม่เกิน 1 GB ต่อไฟล์)
+                          รองรับทุกนามสกุลไฟล์ {materialType === 'VIDEO' ? '(MP4, WebM, MKV, MOV, AVI, WMV ฯลฯ)' : '(PDF, DOCX, PPTX)'}
                         </p>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {materialType === 'VIDEO' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-900 mb-1">
+                      หรือระบุลิงก์วิดีโอ (YouTube, Google Drive, Direct Video Link)
+                    </label>
+                    <Input
+                      placeholder="เช่น https://www.youtube.com/watch?v=... หรือ https://drive.google.com/..."
+                      value={videoLinkUrl}
+                      onChange={(e) => setVideoLinkUrl(e.target.value)}
+                      className="rounded-xl text-xs bg-slate-50 border-slate-200"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      * สามารถเลือกแนบไฟล์วิดีโอจากเครื่อง หรือใส่ลิงก์คลิปจาก YouTube / Google Drive ได้
+                    </p>
+                  </div>
+                )}
 
                 {/* Google Forms Post-Lesson Quiz Options */}
                 <div className="pt-3 border-t border-slate-100 space-y-3">

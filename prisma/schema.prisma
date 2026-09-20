@@ -125,6 +125,8 @@ model Course {
   accessType      AccessType   @default(APPROVAL_REQUIRED)
   rejectionReason String?
   storageLimitGb  Float        @default(10.0)
+  hasQuiz         Boolean      @default(false)
+  quizUrl         String?
   createdById     String
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

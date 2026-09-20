@@ -16,6 +16,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'ไม่พบสื่อการเรียนรู้' }, { status: 404 });
     }
 
+    if (material.filePath && (material.filePath.startsWith('http://') || material.filePath.startsWith('https://') || material.filePath.startsWith('blob:'))) {
+      return NextResponse.redirect(material.filePath);
+    }
+
     const baseDir = path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads');
     const fullPath = path.join(baseDir, material.filePath);
 
@@ -23,6 +27,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       // Fallback sample video stream for smooth in-browser playback
       return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
     }
+
+    const ext = path.extname(material.filePath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mkv': 'video/x-matroska',
+      '.mov': 'video/quicktime',
+      '.avi': 'video/x-msvideo',
+      '.m4v': 'video/mp4',
+      '.ogv': 'video/ogg',
+      '.ogg': 'video/ogg',
+      '.mp3': 'audio/mpeg',
+      '.pdf': 'application/pdf',
+    };
+    const contentType = material.mimeType || mimeMap[ext] || 'video/mp4';
 
     const stat = fs.statSync(fullPath);
     const fileSize = stat.size;
@@ -39,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunksize.toString(),
-        'Content-Type': material.mimeType || 'video/mp4',
+        'Content-Type': contentType,
       };
 
       // @ts-ignore - ReadableStream conversion for Web API Response
@@ -47,7 +66,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } else {
       const headers = {
         'Content-Length': fileSize.toString(),
-        'Content-Type': material.mimeType || 'video/mp4',
+        'Content-Type': contentType,
       };
 
       const file = fs.createReadStream(fullPath);
