@@ -26,38 +26,47 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
     }
 
-    const baseDir = path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads');
-    const fullPath = path.join(baseDir, material.filePath);
-    let activeStreamPath = fullPath;
-    let ext = path.extname(material.filePath).toLowerCase();
+    // Clean filePath to remove leading slashes or 'uploads/'
+    let cleanRelPath = material.filePath.replace(/^\/?uploads\/?/, '').replace(/^\//, '');
 
-    // If file is .mov, check or convert to browser-compatible .mp4 so the user's actual video plays
-    if (ext === '.mov') {
-      const mp4Path = fullPath.replace(/\.mov$/i, '.mp4');
-      if (fs.existsSync(mp4Path)) {
-        activeStreamPath = mp4Path;
-        ext = '.mp4';
-      } else {
-        try {
-          const buf = fs.readFileSync(fullPath);
-          if (buf.length > 20 && buf.toString('ascii', 4, 8) === 'ftyp') {
-            const newBuf = Buffer.from(buf);
-            newBuf.write('isom', 8, 4, 'ascii');
-            newBuf.write('mp42', 16, 4, 'ascii');
-            fs.writeFileSync(mp4Path, newBuf);
-            activeStreamPath = mp4Path;
-            ext = '.mp4';
-          }
-        } catch (e) {
-          console.error('Error preparing mp4 for mov:', e);
-        }
+    // Check candidate base directories (local dev and Vercel public directory)
+    const candidateDirs = [
+      path.join(process.cwd(), 'public', 'uploads'),
+      path.resolve('./public/uploads'),
+      path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads'),
+      path.join(process.cwd(), 'uploads'),
+    ];
+
+    let activeStreamPath: string | null = null;
+    let foundInPublic = false;
+
+    for (const dir of candidateDirs) {
+      const p1 = path.join(dir, cleanRelPath);
+      const p2 = path.join(dir, cleanRelPath.replace(/\.mov$/i, '.mp4'));
+      if (fs.existsSync(p2)) {
+        activeStreamPath = p2;
+        cleanRelPath = cleanRelPath.replace(/\.mov$/i, '.mp4');
+        if (dir.includes('public')) foundInPublic = true;
+        break;
+      }
+      if (fs.existsSync(p1)) {
+        activeStreamPath = p1;
+        if (dir.includes('public')) foundInPublic = true;
+        break;
       }
     }
 
-    if (!fs.existsSync(activeStreamPath)) {
+    // If served from public, we can redirect directly to Vercel CDN static path for fastest streaming
+    if (foundInPublic) {
+      const url = new URL(`/uploads/${cleanRelPath.replace(/\\/g, '/')}`, request.url);
+      return NextResponse.redirect(url);
+    }
+
+    if (!activeStreamPath || !fs.existsSync(activeStreamPath)) {
       return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
     }
 
+    const ext = path.extname(activeStreamPath).toLowerCase();
     const mimeMap: Record<string, string> = {
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
@@ -79,7 +88,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
       const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(fullPath, { start, end });
+      const file = fs.createReadStream(activeStreamPath, { start, end });
 
       const headers = {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -96,7 +105,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         'Content-Type': contentType,
       };
 
-      const file = fs.createReadStream(fullPath);
+      const file = fs.createReadStream(activeStreamPath);
       // @ts-ignore
       return new Response(file as any, { status: 200, headers });
     }
