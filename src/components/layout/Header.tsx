@@ -266,8 +266,8 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
             })}
           </nav>
 
-          {/* Clean Integrated Search Bar with Dropdown (Hidden on Professor Page) */}
-          {!pathname?.startsWith('/professor') && (
+          {/* Clean Integrated Search Bar with Dropdown (Only visible for Student Role) */}
+          {effectiveRole === 'STUDENT' && (
             <form onSubmit={executeHeaderSearch} className="flex items-center bg-slate-100/90 hover:bg-white rounded-full border border-slate-200 focus-within:border-slate-900 focus-within:bg-white transition-all overflow-hidden flex-shrink min-w-[250px] xl:min-w-[310px]">
               <select
                 value={headerSearchType}
