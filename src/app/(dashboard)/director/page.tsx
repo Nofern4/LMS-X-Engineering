@@ -230,7 +230,7 @@ export default function DirectorDashboard() {
               </div>
               <h3 className="text-sm font-black text-slate-900">3. ข้อมูลการพิจารณาอนุมัติ</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                การตรวจสอบมาตรฐานวิชาการ พิจารณาเปิดรายวิชาใหม่ และอนุมัติสื่อการเรียนรู้ก่อนเผยแพร่
+                การตรวจสอบมาตรฐานวิชาการและพิจารณาอนุมัติคำขอเปิดรายวิชาใหม่
               </p>
             </div>
 

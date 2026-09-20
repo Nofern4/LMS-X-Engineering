@@ -4,21 +4,18 @@ import React, { useEffect, useState } from 'react';
 import {
   CheckCircle,
   XCircle,
-  FileCheck,
-  BookOpen
+  BookOpen,
+  ShieldCheck,
+  GraduationCap
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
 export default function CourseApproverDashboard() {
-  const [activeTab, setActiveTab] = useState<'COURSES' | 'MATERIALS'>('COURSES');
   const [courses, setCourses] = useState<any[]>([]);
-  const [materials, setMaterials] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'APPROVE' | 'REJECT'>('APPROVE');
-  const [itemType, setItemType] = useState<'COURSE' | 'MATERIAL'>('COURSE');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -31,9 +28,8 @@ export default function CourseApproverDashboard() {
       });
   }, []);
 
-  const handleOpenDecision = (item: any, type: 'COURSE' | 'MATERIAL', decision: 'APPROVE' | 'REJECT') => {
-    setSelectedItem(item);
-    setItemType(type);
+  const handleOpenDecision = (course: any, decision: 'APPROVE' | 'REJECT') => {
+    setSelectedItem(course);
     setActionType(decision);
     setRejectionReason('');
     setIsModalOpen(true);
@@ -44,21 +40,16 @@ export default function CourseApproverDashboard() {
     setIsLoading(true);
 
     try {
-      if (itemType === 'COURSE') {
-        await fetch(`/api/courses/${selectedItem.id}/approve`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user: { id: 'approver-1', roles: ['COURSE_CREATOR_APPROVER'] },
-            action: actionType,
-            rejectionReason,
-          }),
-        });
-        setCourses((prev) => prev.filter((c) => c.id !== selectedItem.id));
-      } else if (itemType === 'MATERIAL') {
-        setMaterials((prev) => prev.filter((m) => m.id !== selectedItem.id));
-      }
-
+      await fetch(`/api/courses/${selectedItem.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: { id: 'approver-1', roles: ['COURSE_CREATOR_APPROVER'] },
+          action: actionType,
+          rejectionReason,
+        }),
+      });
+      setCourses((prev) => prev.filter((c) => c.id !== selectedItem.id));
       setIsModalOpen(false);
     } catch (e) {
       console.error(e);
@@ -69,12 +60,21 @@ export default function CourseApproverDashboard() {
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
-      {/* Approver Header Banner with Professional Tone */}
+      {/* Approver Header Banner */}
       <div className="p-6 sm:p-8 bg-black text-white rounded-3xl border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="space-y-2.5 relative z-10 max-w-3xl">
+        <div className="space-y-2 relative z-10 max-w-3xl">
+          <div className="flex items-center gap-2">
+            <span className="px-3.5 py-1 rounded-full bg-[#CEF34B]/20 text-[#CEF34B] font-extrabold text-xs border border-[#CEF34B]/40 inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>ศูนย์อนุมัติรายวิชา</span>
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            อนุมัติรายวิชาและสื่อการสอน
+            อนุมัติคำขอเปิดรายวิชา
           </h1>
+          <p className="text-xs text-slate-300">
+            พิจารณาและตรวจสอบมาตรฐานรายวิชาใหม่จากอาจารย์ผู้สอน เพื่อเปิดให้ผู้เรียนเข้าศึกษา
+          </p>
         </div>
 
         {/* Ambient glow decoration */}
@@ -82,241 +82,148 @@ export default function CourseApproverDashboard() {
       </div>
 
       {/* Overview Metric Cards for Approver */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div
-          onClick={() => setActiveTab('COURSES')}
-          className={`p-6 rounded-3xl border cursor-pointer transition-all ${
-            activeTab === 'COURSES'
-              ? 'bg-black text-white border-black shadow-lg ring-2 ring-[#CEF34B]/50'
-              : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300 shadow-xs'
-          }`}
-        >
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-6 rounded-3xl bg-black text-white border border-black shadow-lg">
           <div className="flex items-center justify-between">
-            <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold border transition-all ${
-                activeTab === 'COURSES'
-                  ? 'bg-[#CEF34B] text-black border-[#CEF34B]'
-                  : 'bg-slate-900 text-[#CEF34B] border-slate-800'
-              }`}
-            >
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#CEF34B] text-black border border-[#CEF34B]">
               <BookOpen className="w-6 h-6" />
             </div>
-            <span
-              className={`px-3.5 py-1 rounded-full font-extrabold text-xs transition-all ${
-                activeTab === 'COURSES'
-                  ? 'bg-[#CEF34B] text-black shadow-xs'
-                  : 'bg-slate-100 text-slate-700 border border-slate-200'
-              }`}
-            >
+            <span className="px-3.5 py-1 rounded-full font-extrabold text-xs bg-[#CEF34B] text-black shadow-xs">
               {courses.length} คำขอ
             </span>
           </div>
-          <h3 className={`text-base font-extrabold mt-4 ${activeTab === 'COURSES' ? 'text-white' : 'text-slate-900'}`}>
-            1. คำขอเปิดรายวิชาใหม่
+          <h3 className="text-base font-extrabold mt-4 text-white">
+            คำขอเปิดรายวิชาใหม่
           </h3>
-          <p className={`text-xs mt-1 ${activeTab === 'COURSES' ? 'text-slate-300' : 'text-slate-500'}`}>
-            ตรวจสอบโครงสร้างรายวิชาและรายละเอียดหลักสูตร
+          <p className="text-xs mt-1 text-slate-300">
+            รอการพิจารณาอนุมัติเปิดสอนในระบบ
           </p>
         </div>
 
-        <div
-          onClick={() => setActiveTab('MATERIALS')}
-          className={`p-6 rounded-3xl border cursor-pointer transition-all ${
-            activeTab === 'MATERIALS'
-              ? 'bg-black text-white border-black shadow-lg ring-2 ring-[#CEF34B]/50'
-              : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300 shadow-xs'
-          }`}
-        >
+        <div className="p-6 rounded-3xl bg-white text-slate-900 border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
-            <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold border transition-all ${
-                activeTab === 'MATERIALS'
-                  ? 'bg-[#CEF34B] text-black border-[#CEF34B]'
-                  : 'bg-slate-900 text-[#CEF34B] border-slate-800'
-              }`}
-            >
-              <FileCheck className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-900 text-[#CEF34B] border border-slate-800">
+              <GraduationCap className="w-6 h-6" />
             </div>
-            <span
-              className={`px-3.5 py-1 rounded-full font-extrabold text-xs transition-all ${
-                activeTab === 'MATERIALS'
-                  ? 'bg-[#CEF34B] text-black shadow-xs'
-                  : 'bg-slate-100 text-slate-700 border border-slate-200'
-              }`}
-            >
-              {materials.length} คำขอ
+            <span className="px-3.5 py-1 rounded-full font-extrabold text-xs bg-slate-100 text-slate-700 border border-slate-200">
+              ทุกสาขาวิชา
             </span>
           </div>
-          <h3 className={`text-base font-extrabold mt-4 ${activeTab === 'MATERIALS' ? 'text-white' : 'text-slate-900'}`}>
-            2. สื่อการเรียนการสอน
+          <h3 className="text-base font-extrabold mt-4 text-slate-900">
+            มาตรฐานวิชาการ
           </h3>
-          <p className={`text-xs mt-1 ${activeTab === 'MATERIALS' ? 'text-slate-300' : 'text-slate-500'}`}>
-            ตรวจสอบวิดีโอปฏิบัติการและเอกสารประกอบการสอน
+          <p className="text-xs mt-1 text-slate-500">
+            เปิดกว้างให้นักศึกษาทุกหลักสูตรเข้าเรียนได้
+          </p>
+        </div>
+
+        <div className="p-6 rounded-3xl bg-white text-slate-900 border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-100 text-emerald-700 border border-emerald-200">
+              <CheckCircle className="w-6 h-6 text-emerald-600" />
+            </div>
+            <span className="px-3.5 py-1 rounded-full font-extrabold text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
+              พร้อมใช้งาน
+            </span>
+          </div>
+          <h3 className="text-base font-extrabold mt-4 text-slate-900">
+            ระบบพิจารณาอัตโนมัติ
+          </h3>
+          <p className="text-xs mt-1 text-slate-500">
+            แจ้งผลอนุมัติกลับไปยังผู้สอนทันที
           </p>
         </div>
       </div>
 
       {/* Main Approval Action Container */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden space-y-4">
-        {/* Navigation Tabs (Signature Lime Pill Aesthetic) */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('COURSES')}
-            className={`px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 ${
-              activeTab === 'COURSES'
-                ? 'bg-black text-[#CEF34B] shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
-            }`}
-          >
-            <BookOpen className={`w-4 h-4 ${activeTab === 'COURSES' ? 'text-[#CEF34B]' : 'text-slate-500'}`} />
-            <span>คำขอเปิดรายวิชา ({courses.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('MATERIALS')}
-            className={`px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 ${
-              activeTab === 'MATERIALS'
-                ? 'bg-black text-[#CEF34B] shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
-            }`}
-          >
-            <FileCheck className={`w-4 h-4 ${activeTab === 'MATERIALS' ? 'text-[#CEF34B]' : 'text-slate-500'}`} />
-            <span>สื่อการเรียนรู้ ({materials.length})</span>
-          </button>
+        <div className="p-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-black text-[#CEF34B] flex items-center justify-center">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900">
+                รายการคำขอเปิดรายวิชา ({courses.length})
+              </h2>
+              <p className="text-xs text-slate-500">ตรวจสอบรายละเอียดหลักสูตรและกดอนุมัติเพื่อเปิดใช้งาน</p>
+            </div>
+          </div>
         </div>
 
-        {/* TAB 1: อนุมัติสร้างรายวิชา */}
-        {activeTab === 'COURSES' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold">
-                  <th className="p-3.5 pl-6">รหัสวิชา</th>
-                  <th className="p-3.5">ชื่อรายวิชา</th>
-                  <th className="p-3.5">อาจารย์ผู้ขอเปิด</th>
-                  <th className="p-3.5">หมวดหมู่</th>
-                  <th className="p-3.5">สถานะ</th>
-                  <th className="p-3.5 pr-6 text-right">ปุ่มกดอนุมัติเปิดวิชา</th>
+        {/* Course Approval Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100/70 text-slate-600 border-b border-slate-200 font-bold uppercase tracking-wider">
+                <th className="p-4 pl-6">รหัสวิชา</th>
+                <th className="p-4">ชื่อรายวิชา</th>
+                <th className="p-4">อาจารย์ผู้ขอเปิด</th>
+                <th className="p-4">หมวดหมู่</th>
+                <th className="p-4">สถานะ</th>
+                <th className="p-4 pr-6 text-right">การพิจารณา</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {courses.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-slate-500 font-medium">
+                    ไม่มีคำขอเปิดรายวิชาที่ค้างรอการตรวจสอบในระบบ
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {courses.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      ไม่มีคำขอเปิดรายวิชาที่ค้างอยู่ในระบบ
+              ) : (
+                courses.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 pl-6 font-mono font-bold text-slate-900">{c.code}</td>
+                    <td className="p-4 font-bold text-slate-900">{c.title}</td>
+                    <td className="p-4 text-slate-600">{c.createdBy?.name || 'ผศ.ดร.วิชาญ สอนดี'}</td>
+                    <td className="p-4 text-slate-600">{c.category}</td>
+                    <td className="p-4">
+                      <span className="px-3 py-1 rounded-full bg-black text-[#CEF34B] font-mono text-[10px] font-extrabold border border-slate-800 shadow-xs inline-flex items-center gap-1">
+                        รอการอนุมัติ
+                      </span>
+                    </td>
+                    <td className="p-4 pr-6 text-right space-x-2">
+                      <button
+                        onClick={() => handleOpenDecision(c, 'APPROVE')}
+                        className="bg-[#CEF34B] hover:bg-[#bce038] text-black rounded-full text-xs font-extrabold px-4 py-2 transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5 text-black" />
+                        <span>อนุมัติเปิดรายวิชา</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenDecision(c, 'REJECT')}
+                        className="border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-full text-xs font-bold px-4 py-2 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>ไม่อนุมัติ</span>
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  courses.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-3.5 pl-6 font-mono font-bold text-slate-900">{c.code}</td>
-                      <td className="p-3.5 font-bold text-slate-900">{c.title}</td>
-                      <td className="p-3.5 text-slate-600">{c.createdBy?.name || 'ผศ.ดร.วิชาญ สอนดี'}</td>
-                      <td className="p-3.5 text-slate-600">{c.category}</td>
-                      <td className="p-3.5">
-                        <span className="px-3 py-1 rounded-full bg-black text-[#CEF34B] font-mono text-[10px] font-extrabold border border-slate-800 shadow-xs inline-flex items-center gap-1">
-                          รอการอนุมัติ
-                        </span>
-                      </td>
-                      <td className="p-3.5 pr-6 text-right space-x-2">
-                        <button
-                          onClick={() => handleOpenDecision(c, 'COURSE', 'APPROVE')}
-                          className="bg-[#CEF34B] hover:bg-[#bce038] text-black rounded-full text-xs font-extrabold px-4 py-2 transition-all shadow-xs inline-flex items-center gap-1.5"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 text-black" />
-                          <span>อนุมัติเปิดรายวิชา</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenDecision(c, 'COURSE', 'REJECT')}
-                          className="border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-full text-xs font-bold px-4 py-2 transition-all inline-flex items-center gap-1.5"
-                        >
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          <span>ไม่อนุมัติ</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* TAB 2: อนุมัติสื่อการสอน */}
-        {activeTab === 'MATERIALS' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold">
-                  <th className="p-3.5 pl-6">ประเภทสื่อ</th>
-                  <th className="p-3.5">ชื่อสื่อการเรียนรู้</th>
-                  <th className="p-3.5">รายวิชา</th>
-                  <th className="p-3.5">ผู้อัปโหลด</th>
-                  <th className="p-3.5">ขนาดไฟล์</th>
-                  <th className="p-3.5 pr-6 text-right">ปุ่มกดอนุมัติสื่อ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {materials.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      ไม่มีสื่อการเรียนรู้ที่ค้างรอการตรวจสอบ
-                    </td>
-                  </tr>
-                ) : (
-                  materials.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-3.5 pl-6">
-                        <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-[#CEF34B] font-mono font-bold text-[10px]">
-                          {m.type}
-                        </span>
-                      </td>
-                      <td className="p-3.5 font-bold text-slate-900">{m.title}</td>
-                      <td className="p-3.5 font-mono text-slate-900 font-bold">{m.courseCode}</td>
-                      <td className="p-3.5 text-slate-600">{m.uploadedBy}</td>
-                      <td className="p-3.5 font-mono text-slate-500">{m.fileSize}</td>
-                      <td className="p-3.5 pr-6 text-right space-x-2">
-                        <button
-                          onClick={() => handleOpenDecision(m, 'MATERIAL', 'APPROVE')}
-                          className="bg-[#CEF34B] hover:bg-[#bce038] text-black rounded-full text-xs font-extrabold px-4 py-2 transition-all shadow-xs inline-flex items-center gap-1.5"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 text-black" />
-                          <span>อนุมัติสื่อการสอน</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenDecision(m, 'MATERIAL', 'REJECT')}
-                          className="border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-full text-xs font-bold px-4 py-2 transition-all inline-flex items-center gap-1.5"
-                        >
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          <span>ส่งกลับแก้ไข</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Decision Confirmation Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={actionType === 'APPROVE' ? 'ยืนยันการอนุมัติ' : 'ระบุข้อคิดเห็นเพื่อส่งกลับแก้ไข'}
+        title={actionType === 'APPROVE' ? 'ยืนยันการอนุมัติเปิดรายวิชา' : 'ระบุข้อคิดเห็นเพื่อส่งกลับแก้ไข'}
         footer={
           <>
-            <button 
-              className="rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 px-5 py-2 text-xs font-bold transition-all" 
+            <button
+              className="rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 px-5 py-2 text-xs font-bold transition-all cursor-pointer"
               onClick={() => setIsModalOpen(false)}
             >
               ยกเลิก
             </button>
             <button
-              className={`rounded-full text-xs font-extrabold px-6 py-2 shadow-sm transition-all ${
-                actionType === 'APPROVE' 
-                  ? 'bg-[#CEF34B] hover:bg-[#bce038] text-black' 
+              className={`rounded-full text-xs font-extrabold px-6 py-2 shadow-sm transition-all cursor-pointer ${
+                actionType === 'APPROVE'
+                  ? 'bg-[#CEF34B] hover:bg-[#bce038] text-black'
                   : 'bg-rose-600 hover:bg-rose-700 text-white'
               }`}
               disabled={isLoading}
@@ -329,7 +236,7 @@ export default function CourseApproverDashboard() {
       >
         <div className="space-y-4 text-xs text-slate-900">
           <p>
-            คุณกำลังพิจารณาคำขอสำหรับ: <strong className="text-black font-extrabold">{selectedItem?.title || selectedItem?.code || selectedItem?.studentName}</strong>
+            คุณกำลังพิจารณาคำขอสำหรับ: <strong className="text-black font-extrabold">{selectedItem?.title || selectedItem?.code}</strong>
           </p>
 
           {actionType === 'REJECT' && (
