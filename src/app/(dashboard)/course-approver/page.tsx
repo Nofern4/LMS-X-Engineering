@@ -25,6 +25,7 @@ export default function CourseApproverDashboard() {
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchApprovals = async () => {
+    if (isActionPendingRef.current) return;
     try {
       const [cRes, eRes] = await Promise.all([
         fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' }),
@@ -35,8 +36,10 @@ export default function CourseApproverDashboard() {
       const pendingCourses = (cData.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
       const pendingEnrollments = eData.enrollments || [];
 
-      setCourses(pendingCourses);
-      setEnrollments(pendingEnrollments);
+      if (!isActionPendingRef.current) {
+        setCourses(pendingCourses);
+        setEnrollments(pendingEnrollments);
+      }
     } catch (err) {
       console.error('fetchApprovals error:', err);
     }
@@ -72,11 +75,29 @@ export default function CourseApproverDashboard() {
     setIsModalOpen(true);
   };
 
+  const isActionPendingRef = React.useRef(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
   const handleConfirmDecision = async () => {
     if (!selectedItem) return;
-    setIsLoading(true);
+    const targetItem = selectedItem;
+    const targetType = itemType;
+    const targetAction = actionType;
+    const targetReason = rejectionReason;
 
-    let userPayload: any = { id: 'approver-1', roles: ['COURSE_CREATOR_APPROVER'] };
+    // 1. Optimistic instant removal from UI
+    isActionPendingRef.current = true;
+    if (targetType === 'COURSE') {
+      setCourses((prev) => prev.filter((c) => c.id !== targetItem.id));
+      setSuccessToast(targetAction === 'APPROVE' ? `อนุมัติเปิดรายวิชา ${targetItem.title || targetItem.code} สำเร็จแล้ว` : `ปฏิเสธคำขอเปิดรายวิชาเรียบร้อยแล้ว`);
+    } else {
+      setEnrollments((prev) => prev.filter((e) => e.id !== targetItem.id));
+      setSuccessToast(targetAction === 'APPROVE' ? `อนุมัตินักศึกษา ${targetItem.student?.name || 'นักศึกษา'} เข้าเรียนสำเร็จแล้ว` : `ปฏิเสธคำขอเข้าเรียนเรียบร้อยแล้ว`);
+    }
+    setIsModalOpen(false);
+    setTimeout(() => setSuccessToast(null), 4000);
+
+    let userPayload: any = { id: 'approver-1', roles: ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'APPROVER', 'ADMIN'] };
     try {
       const sess = localStorage.getItem('user_session');
       if (sess) {
@@ -84,51 +105,62 @@ export default function CourseApproverDashboard() {
         userPayload = {
           id: parsed.id || 'approver-1',
           email: parsed.email,
-          roles: parsed.roles || ['COURSE_CREATOR_APPROVER'],
+          roles: parsed.roles || ['COURSE_CREATOR_APPROVER', 'APPROVER', 'ADMIN'],
         };
       }
     } catch {}
 
     try {
-      if (itemType === 'COURSE') {
-        await fetch(`/api/courses/${selectedItem.id}/approve`, {
+      if (targetType === 'COURSE') {
+        await fetch(`/api/courses/${targetItem.id}/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user: userPayload,
-            action: actionType,
-            rejectionReason,
+            action: targetAction,
+            rejectionReason: targetReason,
           }),
         });
-        setCourses((prev) => prev.filter((c) => c.id !== selectedItem.id));
       } else {
         await fetch('/api/courses/enrollments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            courseId: selectedItem.courseId || selectedItem.course?.id,
-            studentId: selectedItem.studentId || selectedItem.student?.id,
-            action: actionType,
-            rejectionReason,
+            courseId: targetItem.courseId || targetItem.course?.id,
+            studentId: targetItem.studentId || targetItem.student?.id,
+            action: targetAction,
+            rejectionReason: targetReason,
             user: userPayload,
           }),
         });
-        setEnrollments((prev) => prev.filter((e) => e.id !== selectedItem.id));
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('enrollment_updated'));
-          localStorage.setItem('last_enrollment_update', Date.now().toString());
-        }
       }
-      setIsModalOpen(false);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('course_updated'));
+        window.dispatchEvent(new Event('enrollment_updated'));
+        localStorage.setItem('last_course_update', Date.now().toString());
+        localStorage.setItem('last_enrollment_update', Date.now().toString());
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Decision error:', e);
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        isActionPendingRef.current = false;
+        fetchApprovals();
+      }, 1200);
     }
   };
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
+      {/* Toast Notice */}
+      {successToast && (
+        <div className="p-4 rounded-2xl bg-[#CEF34B] text-black font-black text-sm flex items-center gap-3 shadow-xl animate-fadeIn border-2 border-black">
+          <CheckCircle className="w-5 h-5 text-black flex-shrink-0" />
+          <span>{successToast}</span>
+        </div>
+      )}
+
       {/* Approver Header Banner */}
       <div className="p-6 sm:p-8 bg-black text-white rounded-3xl border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="space-y-2 relative z-10 max-w-3xl">

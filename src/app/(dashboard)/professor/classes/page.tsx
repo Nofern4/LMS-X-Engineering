@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Video, Play, Clock, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { VideoPlayer } from '@/components/ui/VideoPlayer';
@@ -17,35 +17,112 @@ interface ProfessorVideoClip {
   fileSizeText: string;
   uploadDate: string;
   videoUrl?: string;
+  courseId?: string;
 }
 
-const PROFESSOR_VIDEO_CLIPS: ProfessorVideoClip[] = [
-  { id: 'vid-cs-1', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 1: พื้นฐานการเขียนโปรแกรมและโครงสร้างข้อมูลเบื้องต้น', description: 'แนะนำภาษาโปรแกรมมิ่ง วิธีการติดตั้งเครื่องมือ Compiler, IDE และโครงสร้างโปรแกรมพื้นฐาน', durationText: '60:00 นาที', fileSizeText: '480 MB', uploadDate: '1 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' },
-  { id: 'vid-cs-2', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 2: ตัวแปร ชนิดข้อมูล เงื่อนไข และลูปการทำงาน', description: 'การประกาศตัวแปร ชนิดข้อมูลต่างๆ การใช้คำสั่ง if-else และการวนซ้ำด้วย for/while loop', durationText: '70:00 นาที', fileSizeText: '520 MB', uploadDate: '3 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4' },
-  { id: 'vid-cs-3', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 3: ฟังก์ชัน พอยน์เตอร์ และอาร์เรย์ขั้นสูง', description: 'การสร้าง Modular Functions, การจัดการหน่วยความจำผ่าน Pointer และการประมวลผล Array', durationText: '85:00 นาที', fileSizeText: '610 MB', uploadDate: '7 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' },
-  { id: 'vid-ee-1', courseCode: 'EE305', courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', category: 'ช่างไฟฟ้ากำลัง', title: 'บทที่ 1: วงจรควบคุมมอเตอร์ไฟฟ้าและ Magnetic Contactor', description: 'การต่อวงจรควบคุมมอเตอร์ 3 เฟส ด้วย Magnetic Contactor, Overload Relay และ Safety Interlock', durationText: '75:00 นาที', fileSizeText: '550 MB', uploadDate: '4 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4' },
-  { id: 'vid-ee-2', courseCode: 'EE305', courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', category: 'ช่างไฟฟ้ากำลัง', title: 'บทที่ 2: การเขียนโปรแกรม PLC ด้วย Ladder Diagram และการเชื่อมต่อ IoT', description: 'หลักการทำงานของ PLC อุตสาหกรรม, การออกแบบ Ladder Diagram ควบคุม I/O และเชื่อมต่อ IoT Broker', durationText: '90:00 นาที', fileSizeText: '620 MB', uploadDate: '9 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4' },
-  { id: 'vid-se-1', courseCode: 'SE302', courseTitle: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', category: 'วิศวกรรมซอฟต์แวร์', title: 'บทที่ 1: สถาปัตยกรรม Clean Architecture และ Microservices', description: 'การแบ่ง Layer ระบบแบบ Clean Architecture, Domain-Driven Design และการสื่อสารระหว่าง Microservices', durationText: '75:00 นาที', fileSizeText: '580 MB', uploadDate: '5 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4' },
-  { id: 'vid-se-2', courseCode: 'SE302', courseTitle: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', category: 'วิศวกรรมซอฟต์แวร์', title: 'บทที่ 2: Design Patterns สำหรับระบบขนาดใหญ่และ Automated Testing', description: 'Factory, Repository, Observer Pattern และการเซ็ตอัป Unit/Integration Tests ร่วมกับ CI/CD Pipeline', durationText: '60:00 นาที', fileSizeText: '490 MB', uploadDate: '10 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4' },
-  { id: 'vid-me-1', courseCode: 'ME201', courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน', category: 'ช่างกลโรงงาน', title: 'บทที่ 1: พื้นฐานงานกลึง งานกัดโลหะ และความปลอดภัยในโรงงานช่างกล', description: 'หลักการทำงานของเครื่องกลึง เครื่องกัด และการเลือกใช้เครื่องมือตัดสำหรับโลหะแต่ละชนิดตามมาตรฐานสากล', durationText: '55:00 นาที', fileSizeText: '470 MB', uploadDate: '2 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4' },
-  { id: 'vid-me-2', courseCode: 'ME201', courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน', category: 'ช่างกลโรงงาน', title: 'บทที่ 2: การเขียนโปรแกรมเครื่องจักร CNC และการวัดละเอียดทางวิศวกรรม', description: 'การเขียนโค้ด G-Code / M-Code สำหรับเครื่องกลึง CNC และการใช้อุปกรณ์วัดละเอียดเกจบล็อก เวอร์เนียร์ ไมโครมิเตอร์', durationText: '65:00 นาที', fileSizeText: '540 MB', uploadDate: '6 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4' },
+const DEFAULT_VIDEO_CLIPS: ProfessorVideoClip[] = [
+  { id: 'vid-cs-1', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 1: พื้นฐานการเขียนโปรแกรมและโครงสร้างข้อมูลเบื้องต้น', description: 'แนะนำภาษาโปรแกรมมิ่ง วิธีการติดตั้งเครื่องมือ Compiler, IDE และโครงสร้างโปรแกรมพื้นฐาน', durationText: '60:00 นาที', fileSizeText: '480 MB', uploadDate: '1 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', courseId: '20b13738-1e27-464e-9f5c-b92899ae25ef' },
+  { id: 'vid-cs-2', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 2: ตัวแปร ชนิดข้อมูล เงื่อนไข และลูปการทำงาน', description: 'การประกาศตัวแปร ชนิดข้อมูลต่างๆ การใช้คำสั่ง if-else และการวนซ้ำด้วย for/while loop', durationText: '70:00 นาที', fileSizeText: '520 MB', uploadDate: '3 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', courseId: '20b13738-1e27-464e-9f5c-b92899ae25ef' },
+  { id: 'vid-cs-3', courseCode: 'CS101', courseTitle: 'การเขียนโปรแกรมคอมพิวเตอร์พื้นฐาน', category: 'วิศวกรรมคอมพิวเตอร์', title: 'บทที่ 3: ฟังก์ชัน พอยน์เตอร์ และอาร์เรย์ขั้นสูง', description: 'การสร้าง Modular Functions, การจัดการหน่วยความจำผ่าน Pointer และการประมวลผล Array', durationText: '85:00 นาที', fileSizeText: '610 MB', uploadDate: '7 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', courseId: '20b13738-1e27-464e-9f5c-b92899ae25ef' },
+  { id: 'vid-ee-1', courseCode: 'EE305', courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', category: 'ช่างไฟฟ้ากำลัง', title: 'บทที่ 1: วงจรควบคุมมอเตอร์ไฟฟ้าและ Magnetic Contactor', description: 'การต่อวงจรควบคุมมอเตอร์ 3 เฟส ด้วย Magnetic Contactor, Overload Relay และ Safety Interlock', durationText: '75:00 นาที', fileSizeText: '550 MB', uploadDate: '4 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', courseId: '05ae7347-940e-463d-a2d9-40905e64c211' },
+  { id: 'vid-ee-2', courseCode: 'EE305', courseTitle: 'ระบบควบคุมไฟฟ้าอุตสาหกรรมและ IoT', category: 'ช่างไฟฟ้ากำลัง', title: 'บทที่ 2: การเขียนโปรแกรม PLC ด้วย Ladder Diagram และการเชื่อมต่อ IoT', description: 'หลักการทำงานของ PLC อุตสาหกรรม, การออกแบบ Ladder Diagram ควบคุม I/O และเชื่อมต่อ IoT Broker', durationText: '90:00 นาที', fileSizeText: '620 MB', uploadDate: '9 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', courseId: '05ae7347-940e-463d-a2d9-40905e64c211' },
+  { id: 'vid-se-1', courseCode: 'SE302', courseTitle: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', category: 'วิศวกรรมซอฟต์แวร์', title: 'บทที่ 1: สถาปัตยกรรม Clean Architecture และ Microservices', description: 'การแบ่ง Layer ระบบแบบ Clean Architecture, Domain-Driven Design และการสื่อสารระหว่าง Microservices', durationText: '75:00 นาที', fileSizeText: '580 MB', uploadDate: '5 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4', courseId: '1dc8edb3-d31e-4c96-ae04-72a61bcd1c10' },
+  { id: 'vid-se-2', courseCode: 'SE302', courseTitle: 'สถาปัตยกรรมซอฟต์แวร์และการออกแบบระบบ', category: 'วิศวกรรมซอฟต์แวร์', title: 'บทที่ 2: Design Patterns สำหรับระบบขนาดใหญ่และ Automated Testing', description: 'Factory, Repository, Observer Pattern และการเซ็ตอัป Unit/Integration Tests ร่วมกับ CI/CD Pipeline', durationText: '60:00 นาที', fileSizeText: '490 MB', uploadDate: '10 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', courseId: '1dc8edb3-d31e-4c96-ae04-72a61bcd1c10' },
+  { id: 'vid-me-1', courseCode: 'ME201', courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน', category: 'ช่างกลโรงงาน', title: 'บทที่ 1: พื้นฐานงานกลึง งานกัดโลหะ และความปลอดภัยในโรงงานช่างกล', description: 'หลักการทำงานของเครื่องกลึง เครื่องกัด และการเลือกใช้เครื่องมือตัดสำหรับโลหะแต่ละชนิดตามมาตรฐานสากล', durationText: '55:00 นาที', fileSizeText: '470 MB', uploadDate: '2 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', courseId: 'edc15886-2dda-4b2f-a46b-5a00ebd05ab7' },
+  { id: 'vid-me-2', courseCode: 'ME201', courseTitle: 'วิศวกรรมเครื่องกลและกรรมวิธีการผลิตชิ้นส่วน', category: 'ช่างกลโรงงาน', title: 'บทที่ 2: การเขียนโปรแกรมเครื่องจักร CNC และการวัดละเอียดทางวิศวกรรม', description: 'การเขียนโค้ด G-Code / M-Code สำหรับเครื่องกลึง CNC และการใช้อุปกรณ์วัดละเอียดเกจบล็อก เวอร์เนียร์ ไมโครมิเตอร์', durationText: '65:00 นาที', fileSizeText: '540 MB', uploadDate: '6 ก.ย. 2026', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4', courseId: 'edc15886-2dda-4b2f-a46b-5a00ebd05ab7' },
 ];
 
 export default function ProfessorClassesPage() {
   const [activeVideoModal, setActiveVideoModal] = useState<ProfessorVideoClip | null>(null);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('ALL');
-
-  const courseFilters = [
+  const [allClips, setAllClips] = useState<ProfessorVideoClip[]>(DEFAULT_VIDEO_CLIPS);
+  const [courseFilters, setCourseFilters] = useState([
     { code: 'ALL', label: 'ทั้งหมด' },
     { code: 'CS101', label: 'CS101 (วิศวกรรมคอมพิวเตอร์)' },
     { code: 'SE302', label: 'SE302 (วิศวกรรมซอฟต์แวร์)' },
     { code: 'ME201', label: 'ME201 (ช่างกลโรงงาน)' },
     { code: 'EE305', label: 'EE305 (ช่างไฟฟ้ากำลัง)' },
-  ];
+  ]);
+
+  const fetchClasses = () => {
+    fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        const list: any[] = data.courses || [];
+        const approvedCourses = list.filter((c: any) => c.status === 'PUBLISHED' || c.status === 'APPROVED');
+
+        const filtersMap = new Map<string, string>();
+        filtersMap.set('ALL', 'ทั้งหมด');
+        filtersMap.set('CS101', 'CS101 (วิศวกรรมคอมพิวเตอร์)');
+        filtersMap.set('SE302', 'SE302 (วิศวกรรมซอฟต์แวร์)');
+        filtersMap.set('ME201', 'ME201 (ช่างกลโรงงาน)');
+        filtersMap.set('EE305', 'EE305 (ช่างไฟฟ้ากำลัง)');
+
+        const dynamicClips: ProfessorVideoClip[] = [];
+
+        approvedCourses.forEach((c: any) => {
+          if (!filtersMap.has(c.code)) {
+            filtersMap.set(c.code, `${c.code} (${c.category || c.title})`);
+          }
+
+          const materials = c.materials || [];
+          const videoMats = materials.filter((m: any) => m.type === 'VIDEO');
+
+          if (videoMats.length > 0) {
+            videoMats.forEach((m: any, idx: number) => {
+              dynamicClips.push({
+                id: m.id || `mat-${c.code}-${idx}`,
+                courseCode: c.code,
+                courseTitle: c.title,
+                category: c.category || 'ทั่วไป',
+                title: m.title || `บทเรียน: ${c.title}`,
+                description: m.description || c.description || 'บทเรียนที่ได้รับการอนุมัติและเปิดสอนในระบบ',
+                durationText: m.duration ? `${Math.round(m.duration / 60)}:00 นาที` : '60:00 นาที',
+                fileSizeText: m.fileSize ? `${Math.round(Number(m.fileSize) / (1024 * 1024))} MB` : '150 MB',
+                uploadDate: new Date(m.createdAt || c.createdAt || Date.now()).toLocaleDateString('th-TH'),
+                videoUrl: m.filePath?.startsWith('http') ? m.filePath : `/api/materials/${m.id}/stream`,
+                courseId: c.id,
+              });
+            });
+          } else {
+            dynamicClips.push({
+              id: `course-${c.id}`,
+              courseCode: c.code,
+              courseTitle: c.title,
+              category: c.category || 'ทั่วไป',
+              title: `บทนำรายวิชา: ${c.title}`,
+              description: c.description || 'รายวิชาที่ได้รับการอนุมัติและเปิดสอนในระบบ',
+              durationText: '60:00 นาที',
+              fileSizeText: '180 MB',
+              uploadDate: new Date(c.createdAt || Date.now()).toLocaleDateString('th-TH'),
+              videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+              courseId: c.id,
+            });
+          }
+        });
+
+        const customClips = dynamicClips.filter((dc) => !['CS101', 'SE302', 'ME201', 'EE305'].includes(dc.courseCode));
+        setAllClips([...customClips, ...DEFAULT_VIDEO_CLIPS]);
+
+        const nextFilters = Array.from(filtersMap.entries()).map(([code, label]) => ({ code, label }));
+        setCourseFilters(nextFilters);
+      })
+      .catch((err) => console.error('Failed to fetch classes:', err));
+  };
+
+  useEffect(() => {
+    fetchClasses();
+    window.addEventListener('course_updated', fetchClasses);
+    window.addEventListener('focus', fetchClasses);
+    return () => {
+      window.removeEventListener('course_updated', fetchClasses);
+      window.removeEventListener('focus', fetchClasses);
+    };
+  }, []);
 
   const filteredClips = selectedCourseFilter === 'ALL'
-    ? PROFESSOR_VIDEO_CLIPS
-    : PROFESSOR_VIDEO_CLIPS.filter((c) => c.courseCode === selectedCourseFilter);
+    ? allClips
+    : allClips.filter((c) => c.courseCode === selectedCourseFilter);
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
@@ -57,7 +134,7 @@ export default function ProfessorClassesPage() {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">คลาสที่เปิดสอน</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">ผศ.ดร.วิชาญ สอนดี — {PROFESSOR_VIDEO_CLIPS.length} คลิปวิดีโอ (4 รายวิชาหลัก)</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">รวมคลาสเรียนและสื่อการสอนที่ผ่านการอนุมัติ — {allClips.length} คลิปวิดีโอ ({courseFilters.length - 1} รายวิชา)</p>
           </div>
         </div>
         <Link href="/professor" className="z-10 flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-[#CEF34B] transition-colors">
@@ -115,7 +192,7 @@ export default function ProfessorClassesPage() {
                 <Play className="w-3.5 h-3.5 fill-[#CEF34B]" />
                 <span>เปิดดูคลิปวิดีโอ</span>
               </button>
-              <Link href="/learning/course-1" className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors" title="ไปที่ห้องเรียน">
+              <Link href={`/learning/${clip.courseId || 'course-1'}`} className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors" title="ไปที่ห้องเรียน">
                 <span>ห้องเรียน</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
