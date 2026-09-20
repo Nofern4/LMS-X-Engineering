@@ -41,10 +41,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
     }
 
-    const allowedRoles = ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'PROFESSOR', 'ADMIN', 'REGISTRAR'];
+    const allowedRoles = ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'ADMIN', 'APPROVER'];
     const hasPermission = user?.roles?.some((r: string) => allowedRoles.includes(r));
     if (!user || !hasPermission) {
-      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อนุมัติการเข้าเรียน' }, { status: 403 });
+      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อนุมัติการเข้าเรียน (สิทธิ์เฉพาะผู้มีอำนาจอนุมัติเท่านั้น)' }, { status: 403 });
     }
 
     if (!courseId || !studentId) {

@@ -259,7 +259,6 @@ function ProfessorDashboardContent() {
   const [selectedVideoCourseFilter, setSelectedVideoCourseFilter] = useState<string>('ALL');
   const [activeVideoModal, setActiveVideoModal] = useState<ProfessorVideoClip | null>(null);
   const [extraVideoClips, setExtraVideoClips] = useState<ProfessorVideoClip[]>([]);
-  const [pendingEnrollmentsCount, setPendingEnrollmentsCount] = useState<number>(0);
 
   // Professor Taught Courses Selector List (4 Core Disciplines)
   const [professorCourses, setProfessorCourses] = useState([
@@ -357,26 +356,6 @@ function ProfessorDashboardContent() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => {
-    const fetchPendingEnrollments = () => {
-      fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' })
-        .then((res) => res.json())
-        .then((data) => {
-          setPendingEnrollmentsCount(data.enrollments?.length || 0);
-        })
-        .catch(() => {});
-    };
-
-    fetchPendingEnrollments();
-    const interval = setInterval(fetchPendingEnrollments, 3000);
-    window.addEventListener('enrollment_updated', fetchPendingEnrollments);
-    window.addEventListener('focus', fetchPendingEnrollments);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('enrollment_updated', fetchPendingEnrollments);
-      window.removeEventListener('focus', fetchPendingEnrollments);
-    };
-  }, []);
 
   const courseInterestData = courses.slice(0, 3).map((c, idx) => ({
     code: c.code,
@@ -660,33 +639,6 @@ function ProfessorDashboardContent() {
         </div>
       )}
 
-      {/* Student Enrollment Requests Notification Banner */}
-      {pendingEnrollmentsCount > 0 && (
-        <div className="p-5 rounded-3xl bg-black text-white border-2 border-[#CEF34B] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl animate-fadeIn">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#CEF34B] text-black flex items-center justify-center font-bold flex-shrink-0">
-              <Users className="w-6 h-6 text-black" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#CEF34B] text-black text-[11px] font-black">
-                  รออนุมัติ {pendingEnrollmentsCount} คน
-                </span>
-                <span className="text-xs text-slate-300">คำขอเข้าเรียนใหม่</span>
-              </div>
-              <p className="font-black text-base text-white mt-1">
-                มีนักศึกษาขอเข้าร่วมเรียนรอการอนุมัติสิทธิ์ {pendingEnrollmentsCount} คน
-              </p>
-            </div>
-          </div>
-          <Link href="/course-approver">
-            <button className="px-6 py-2.5 rounded-full bg-[#CEF34B] hover:bg-[#bce038] text-black font-black text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap">
-              <span>อนุมัติการเข้าเรียน ({pendingEnrollmentsCount} คน)</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </Link>
-        </div>
-      )}
 
       {/* Metric Cards - Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
