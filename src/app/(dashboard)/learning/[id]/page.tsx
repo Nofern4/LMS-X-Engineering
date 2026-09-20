@@ -417,11 +417,31 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
     );
   }
 
-  // ห้องปิดและยังไม่ได้รับอนุมัติ → แสดงหน้า Locked
+  // ห้องปิดและยังไม่ได้รับอนุมัติ
   if (isApproved === false) {
-    const coverImg = course?.image || course?.coverImage || 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=1600&q=80';
     const isPending = enrollmentStatus === 'PENDING';
     const isRejected = enrollmentStatus === 'REJECTED';
+
+    // คลาสแบบปิด และสถานะรออนุมัติ → แสดงเฉพาะกรอบสี่เหลี่ยมบอกว่ารออนุมัติเท่านั้น
+    if (isPending) {
+      return (
+        <div className="space-y-6 max-w-2xl mx-auto py-12 px-4 font-sans text-slate-900 animate-fadeIn">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>ย้อนกลับ</span>
+          </button>
+
+          <div className="bg-white border-2 border-slate-300 rounded-xl p-12 text-center shadow-sm">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">รออนุมัติ</h2>
+          </div>
+        </div>
+      );
+    }
+
+    const coverImg = course?.image || course?.coverImage || 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=1600&q=80';
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans text-slate-900 animate-fadeIn">
         <div className="relative rounded-3xl overflow-hidden min-h-[440px] w-full max-w-2xl flex items-center justify-center p-8 sm:p-12 text-center bg-slate-950 border border-slate-800 shadow-2xl group">

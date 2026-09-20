@@ -420,7 +420,7 @@ export default function StudentDashboard() {
                         ) : (
                           <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 font-extrabold text-xs inline-flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-amber-600" />
-                            รออาจารย์ผู้สอนอนุมัติ
+                            รออนุมัติ
                           </span>
                         )}
                       </td>
@@ -434,7 +434,7 @@ export default function StudentDashboard() {
                         ) : (
                           <Link href={`/courses/${course?.id}`}>
                             <button className="bg-[#CEF34B] hover:bg-[#bce038] text-black font-extrabold rounded-full text-xs sm:text-sm px-5 py-2 shadow-xs inline-flex items-center justify-center cursor-pointer">
-                              <span>รออนุมัติ (ดูรายละเอียด)</span>
+                              <span>รออนุมัติ</span>
                             </button>
                           </Link>
                         )}

@@ -69,6 +69,27 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     return <div className="p-8 text-center text-slate-500">กำลังโหลดรายละเอียดรายวิชา...</div>;
   }
 
+  const isClosed = course.accessType === 'APPROVAL_REQUIRED' || course.accessType === 'CLOSED' || course.code === 'EE305' || course.code === 'ME201' || id === 'course-2' || id === 'course-3';
+
+  // ถ้าเป็นคลาสแบบปิด และสถานะรออนุมัติ → แสดงเฉพาะกรอบสี่เหลี่ยมบอกว่ารออนุมัติเท่านั้น
+  if (isClosed && enrollmentStatus === 'PENDING') {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto py-12 px-4 font-sans text-slate-900 animate-fadeIn">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>ย้อนกลับ</span>
+        </button>
+
+        <div className="bg-white border-2 border-slate-300 rounded-xl p-12 text-center shadow-sm">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">รออนุมัติ</h2>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl mx-auto pb-12 text-slate-900 font-sans">
       {/* Back Button */}

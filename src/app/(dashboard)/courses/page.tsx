@@ -347,14 +347,13 @@ export default function GlobalCoursesCatalogPage() {
                     );
                   }
 
-                  // รออนุมัติอยู่ → แสดงสถานะรออนุมัติชัดเจน พร้อมให้กดเข้าไปดูรายละเอียดได้
+                  // รออนุมัติอยู่ → แสดงสถานะรออนุมัติ
                   if (enrollStatus === 'PENDING') {
                     return (
                       <Link href={`/courses/${c.id}`} className="block w-full">
                         <Button variant="secondary" size="md"
-                          className="w-full font-bold rounded-full py-3 text-xs bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer">
-                          <Clock className="w-3.5 h-3.5 text-amber-600" />
-                          <span>รออนุมัติ (ดูรายละเอียด)</span>
+                          className="w-full font-bold rounded-full py-3 text-xs bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center justify-center transition-all cursor-pointer">
+                          <span>รออนุมัติ</span>
                         </Button>
                       </Link>
                     );
