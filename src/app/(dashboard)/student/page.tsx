@@ -7,7 +7,6 @@ import {
   Clock,
   GraduationCap,
   ArrowRight,
-  Sparkles,
   Award,
   BookOpen,
   CheckCircle2,
@@ -225,10 +224,6 @@ export default function StudentDashboard() {
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               รายวิชาที่เปิดสอนประจำภาคเรียน
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-4 h-4 text-lime-600 flex-shrink-0" />
-              <span>ทุกวิชาสามารถเข้าเรียนหรือยื่นขออนุมัติได้ โดยไม่จำกัดสาขาวิชา</span>
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
