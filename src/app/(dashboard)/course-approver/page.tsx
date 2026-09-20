@@ -12,6 +12,7 @@ import {
 import { Modal } from '@/components/ui/Modal';
 
 export default function CourseApproverDashboard() {
+  const [mounted, setMounted] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'courses' | 'enrollments'>('enrollments');
@@ -25,16 +26,16 @@ export default function CourseApproverDashboard() {
 
   const fetchApprovals = async () => {
     try {
-      // 1. Fetch courses waiting approval
-      const cRes = await fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' });
-      const cData = await cRes.json();
-      const pendingCourses = (cData.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
-      setCourses(pendingCourses);
+      const [cRes, eRes] = await Promise.all([
+        fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' }),
+        fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' }),
+      ]);
+      const [cData, eData] = await Promise.all([cRes.json(), eRes.json()]);
 
-      // 2. Fetch student enrollment requests waiting approval
-      const eRes = await fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' });
-      const eData = await eRes.json();
+      const pendingCourses = (cData.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
       const pendingEnrollments = eData.enrollments || [];
+
+      setCourses(pendingCourses);
       setEnrollments(pendingEnrollments);
     } catch (err) {
       console.error('fetchApprovals error:', err);
@@ -42,11 +43,12 @@ export default function CourseApproverDashboard() {
   };
 
   useEffect(() => {
+    setMounted(true);
     fetchApprovals();
     const handleUpdate = () => fetchApprovals();
     window.addEventListener('enrollment_updated', handleUpdate);
     window.addEventListener('focus', handleUpdate);
-    const interval = setInterval(fetchApprovals, 2500);
+    const interval = setInterval(fetchApprovals, 2000);
     return () => {
       clearInterval(interval);
       window.removeEventListener('enrollment_updated', handleUpdate);
@@ -238,7 +240,17 @@ export default function CourseApproverDashboard() {
               }`}
             >
               <BookOpen className="w-4 h-4 text-[#CEF34B]" />
-              <span>คำขอเปิดรายวิชา ({courses.length})</span>
+              <span>คำขอเปิดรายวิชา</span>
+              <span
+                key={`courses-badge-${courses.length}`}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  activeTab === 'courses'
+                    ? 'bg-[#CEF34B] text-black shadow-xs'
+                    : 'bg-slate-200 text-slate-800'
+                }`}
+              >
+                {courses.length}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('enrollments')}
@@ -249,7 +261,17 @@ export default function CourseApproverDashboard() {
               }`}
             >
               <Users className="w-4 h-4 text-[#CEF34B]" />
-              <span>อนุมัติการเข้าเรียน ({enrollments.length} คน)</span>
+              <span>อนุมัติการเข้าเรียน</span>
+              <span
+                key={`enroll-badge-${enrollments.length}`}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  activeTab === 'enrollments'
+                    ? 'bg-[#CEF34B] text-black shadow-xs'
+                    : 'bg-slate-200 text-slate-800'
+                }`}
+              >
+                {enrollments.length} คน
+              </span>
             </button>
           </div>
         </div>
