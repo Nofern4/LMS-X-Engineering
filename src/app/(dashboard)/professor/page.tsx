@@ -39,13 +39,13 @@ import { Input } from '@/components/ui/Input';
 function ProfessorDashboardContent() {
   const [courses, setCourses] = useState<any[]>([]);
   const [courseStudents, setCourseStudents] = useState<Record<string, any[]>>({});
-  const [selectedCourseCode, setSelectedCourseCode] = useState<string>('CS101');
+  const [selectedCourseCode, setSelectedCourseCode] = useState<string>('ALL');
   const [showAllStudents, setShowAllStudents] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Professor Taught Courses Selector List - with ทั้งหมด in front of CS101
+  // Professor Taught Courses Selector List
   const [professorCourses, setProfessorCourses] = useState([
-    { code: 'CS101', label: 'ทั้งหมด CS101 (วิศวกรรมคอมพิวเตอร์)', category: 'วิศวกรรมคอมพิวเตอร์' },
+    { code: 'CS101', label: 'CS101 (วิศวกรรมคอมพิวเตอร์)', category: 'วิศวกรรมคอมพิวเตอร์' },
     { code: 'SE302', label: 'SE302 (วิศวกรรมซอฟต์แวร์)', category: 'วิศวกรรมซอฟต์แวร์' },
     { code: 'ME201', label: 'ME201 (ช่างกลโรงงาน)', category: 'ช่างกลโรงงาน' },
     { code: 'EE305', label: 'EE305 (ช่างไฟฟ้ากำลัง)', category: 'ช่างไฟฟ้ากำลัง' },
@@ -204,10 +204,30 @@ function ProfessorDashboardContent() {
     }
   };
 
+  const allStudents = React.useMemo(() => {
+    const seen = new Set<string>();
+    const list: any[] = [];
+    Object.values(courseStudents).forEach((sList) => {
+      sList.forEach((s) => {
+        if (!seen.has(s.studentId)) {
+          seen.add(s.studentId);
+          list.push(s);
+        }
+      });
+    });
+    return list;
+  }, [courseStudents]);
+
   const currentCourse = courses.find((c) => c.code === selectedCourseCode);
-  const currentStudents = courseStudents[selectedCourseCode] || [];
-  const totalEnrolled = currentCourse?._count?.enrollments ?? currentStudents.length;
-  const completedCount = currentStudents.filter((s) => s.status === 'APPROVED').length || totalEnrolled;
+  const currentStudents = selectedCourseCode === 'ALL'
+    ? allStudents
+    : (courseStudents[selectedCourseCode] || []);
+  const totalEnrolled = selectedCourseCode === 'ALL'
+    ? allStudents.length
+    : (currentCourse?._count?.enrollments ?? currentStudents.length);
+  const completedCount = selectedCourseCode === 'ALL'
+    ? allStudents.length
+    : (currentStudents.filter((s) => s.status === 'APPROVED').length || totalEnrolled);
   const displayedStudents = showAllStudents ? currentStudents : currentStudents.slice(0, 8);
 
   return (
@@ -299,15 +319,29 @@ function ProfessorDashboardContent() {
               <UserCheck className="w-5 h-5 text-slate-900" />
               <span>
                 รายชื่อนักศึกษาที่ลงเรียน{' '}
-                {selectedCourseCode === 'CS101'
-                  ? '- ทั้งหมด CS101 (วิศวกรรมคอมพิวเตอร์)'
-                  : `- ${selectedCourseCode}`}
+                {selectedCourseCode === 'ALL'
+                  ? '- ทั้งหมด'
+                  : `- ${selectedCourseCode} (${professorCourses.find((c) => c.code === selectedCourseCode)?.category || selectedCourseCode})`}
               </span>
             </h2>
           </div>
 
           {/* Select Course Switcher Pills */}
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button
+              key="ALL"
+              onClick={() => {
+                setSelectedCourseCode('ALL');
+                setShowAllStudents(false);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                selectedCourseCode === 'ALL'
+                  ? 'bg-slate-900 text-[#CEF34B] shadow-xs'
+                  : 'text-slate-700 hover:text-black bg-white/60'
+              }`}
+            >
+              ทั้งหมด
+            </button>
             {professorCourses.map((c) => (
               <button
                 key={c.code}
