@@ -15,7 +15,6 @@ import {
   UserCheck,
   BarChart3,
   TrendingUp,
-  Search,
   Calendar,
   Sparkles,
   Award,

@@ -266,44 +266,46 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
             })}
           </nav>
 
-          {/* Clean Integrated Search Bar with Dropdown (Human-Crafted, No Stickers/Emojis) */}
-          <form onSubmit={executeHeaderSearch} className="flex items-center bg-slate-100/90 hover:bg-white rounded-full border border-slate-200 focus-within:border-slate-900 focus-within:bg-white transition-all overflow-hidden flex-shrink min-w-[250px] xl:min-w-[310px]">
-            <select
-              value={headerSearchType}
-              onChange={(e) => {
-                const newType = e.target.value as 'course' | 'instructor' | 'code';
-                setHeaderSearchType(newType);
-                handleHeaderSearch(headerSearch, newType);
-              }}
-              className="bg-transparent text-[11px] font-bold text-slate-700 pl-3 pr-1.5 py-1.5 focus:outline-none cursor-pointer border-r border-slate-200 select-none"
-            >
-              <option value="course">ค้นหารายวิชา</option>
-              <option value="instructor">ค้นหาชื่ออาจารย์</option>
-              <option value="code">ค้นหารหัสวิชา</option>
-            </select>
-            <div className="relative flex-1 flex items-center">
-              <input
-                type="text"
-                value={headerSearch}
-                onChange={(e) => handleHeaderSearch(e.target.value, headerSearchType)}
-                placeholder={
-                  headerSearchType === 'instructor'
-                    ? 'ค้นหาชื่ออาจารย์...'
-                    : headerSearchType === 'code'
-                    ? 'ค้นหารหัสวิชา (ตัวเลข เช่น 101, 302)...'
-                    : 'ค้นหารายวิชา...'
-                }
-                className="w-full pl-2.5 pr-8 py-1.5 text-xs bg-transparent focus:outline-none text-slate-900 font-medium placeholder:text-slate-400"
-              />
-              <button
-                type="submit"
-                title="ค้นหา"
-                className="absolute right-2 p-1 text-slate-400 hover:text-slate-900 transition-colors"
+          {/* Clean Integrated Search Bar with Dropdown (Hidden on Professor Page) */}
+          {!pathname?.startsWith('/professor') && (
+            <form onSubmit={executeHeaderSearch} className="flex items-center bg-slate-100/90 hover:bg-white rounded-full border border-slate-200 focus-within:border-slate-900 focus-within:bg-white transition-all overflow-hidden flex-shrink min-w-[250px] xl:min-w-[310px]">
+              <select
+                value={headerSearchType}
+                onChange={(e) => {
+                  const newType = e.target.value as 'course' | 'instructor' | 'code';
+                  setHeaderSearchType(newType);
+                  handleHeaderSearch(headerSearch, newType);
+                }}
+                className="bg-transparent text-[11px] font-bold text-slate-700 pl-3 pr-1.5 py-1.5 focus:outline-none cursor-pointer border-r border-slate-200 select-none"
               >
-                <Search className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </form>
+                <option value="course">ค้นหารายวิชา</option>
+                <option value="instructor">ค้นหาชื่ออาจารย์</option>
+                <option value="code">ค้นหารหัสวิชา</option>
+              </select>
+              <div className="relative flex-1 flex items-center">
+                <input
+                  type="text"
+                  value={headerSearch}
+                  onChange={(e) => handleHeaderSearch(e.target.value, headerSearchType)}
+                  placeholder={
+                    headerSearchType === 'instructor'
+                      ? 'ค้นหาชื่ออาจารย์...'
+                      : headerSearchType === 'code'
+                      ? 'ค้นหารหัสวิชา (ตัวเลข เช่น 101, 302)...'
+                      : 'ค้นหารายวิชา...'
+                  }
+                  className="w-full pl-2.5 pr-8 py-1.5 text-xs bg-transparent focus:outline-none text-slate-900 font-medium placeholder:text-slate-400"
+                />
+                <button
+                  type="submit"
+                  title="ค้นหา"
+                  className="absolute right-2 p-1 text-slate-400 hover:text-slate-900 transition-colors"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* 3. Action Buttons & Right Pill Capsule */}
