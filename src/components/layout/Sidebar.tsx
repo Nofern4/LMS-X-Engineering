@@ -34,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   useEffect(() => {
     const loadAvatar = () => {
@@ -46,6 +47,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
     window.addEventListener('profile_updated', loadAvatar);
     return () => window.removeEventListener('profile_updated', loadAvatar);
   }, [email]);
+
+  useEffect(() => {
+    const fetchPending = () => {
+      fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d) => {
+          setPendingApprovalsCount(d.enrollments?.length || 0);
+        })
+        .catch(() => {});
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 3000);
+    window.addEventListener('enrollment_updated', fetchPending);
+    window.addEventListener('focus', fetchPending);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('enrollment_updated', fetchPending);
+      window.removeEventListener('focus', fetchPending);
+    };
+  }, []);
   const isDirector = role === 'DIRECTOR';
 
   const handleLogout = () => {
@@ -134,7 +155,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
               }`}
             >
               <span className={isActive ? 'text-[#CEF34B]' : 'text-slate-400'}>{item.icon}</span>
-              <span className="truncate tracking-tight">{item.label}</span>
+              <span className="truncate tracking-tight flex-1">{item.label}</span>
+              {item.href === '/course-approver' && pendingApprovalsCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#CEF34B] text-black text-[10px] font-black shadow-xs">
+                  {pendingApprovalsCount} คน
+                </span>
+              )}
             </Link>
           );
         })}

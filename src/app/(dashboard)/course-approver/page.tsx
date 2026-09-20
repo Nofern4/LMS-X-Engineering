@@ -14,10 +14,10 @@ import { Modal } from '@/components/ui/Modal';
 export default function CourseApproverDashboard() {
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'courses' | 'enrollments'>('courses');
+  const [activeTab, setActiveTab] = useState<'courses' | 'enrollments'>('enrollments');
 
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
-  const [itemType, setItemType] = useState<'COURSE' | 'ENROLLMENT'>('COURSE');
+  const [itemType, setItemType] = useState<'COURSE' | 'ENROLLMENT'>('ENROLLMENT');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'APPROVE' | 'REJECT'>('APPROVE');
@@ -26,21 +26,16 @@ export default function CourseApproverDashboard() {
   const fetchApprovals = async () => {
     try {
       // 1. Fetch courses waiting approval
-      const cRes = await fetch('/api/courses');
+      const cRes = await fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' });
       const cData = await cRes.json();
       const pendingCourses = (cData.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
       setCourses(pendingCourses);
 
       // 2. Fetch student enrollment requests waiting approval
-      const eRes = await fetch('/api/courses/enrollments?status=PENDING');
+      const eRes = await fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' });
       const eData = await eRes.json();
       const pendingEnrollments = eData.enrollments || [];
       setEnrollments(pendingEnrollments);
-
-      // Auto-switch to enrollments tab if there are student requests waiting and no course requests
-      if (pendingCourses.length === 0 && pendingEnrollments.length > 0) {
-        setActiveTab('enrollments');
-      }
     } catch (err) {
       console.error('fetchApprovals error:', err);
     }
@@ -51,7 +46,9 @@ export default function CourseApproverDashboard() {
     const handleUpdate = () => fetchApprovals();
     window.addEventListener('enrollment_updated', handleUpdate);
     window.addEventListener('focus', handleUpdate);
+    const interval = setInterval(fetchApprovals, 2500);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('enrollment_updated', handleUpdate);
       window.removeEventListener('focus', handleUpdate);
     };
@@ -141,12 +138,16 @@ export default function CourseApproverDashboard() {
               <UserCheck className="w-3.5 h-3.5" />
               <span>อนุมัติการเข้าเรียน</span>
             </span>
+            <span className="px-3.5 py-1 rounded-full bg-[#CEF34B] text-black font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm">
+              <Users className="w-3.5 h-3.5 text-black" />
+              <span>คำขอเข้าเรียนรออนุมัติ: {enrollments.length} คน</span>
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             ระบบพิจารณาและอนุมัติ
           </h1>
           <p className="text-xs text-slate-400">
-            พิจารณาอนุมัติคำขอเปิดรายวิชาใหม่จากอาจารย์ผู้สอน และอนุมัติสิทธิ์การเข้าเรียนของนักศึกษา
+            พิจารณาอนุมัติคำขอเปิดรายวิชาใหม่จากอาจารย์ผู้สอน และอนุมัติสิทธิ์การเข้าเรียนของนักศึกษา ({enrollments.length} คน)
           </p>
         </div>
 
@@ -178,7 +179,7 @@ export default function CourseApproverDashboard() {
                 ? 'bg-[#CEF34B] text-black'
                 : 'bg-slate-900 text-[#CEF34B]'
             }`}>
-              {courses.length} คำขอ
+              {courses.length} วิชา
             </span>
           </div>
           <h3 className={`text-base font-extrabold mt-4 ${activeTab === 'courses' ? 'text-white' : 'text-slate-900'}`}>
@@ -211,7 +212,7 @@ export default function CourseApproverDashboard() {
                 ? 'bg-[#CEF34B] text-black'
                 : 'bg-slate-900 text-[#CEF34B]'
             }`}>
-              {enrollments.length} คำขอ
+              {enrollments.length} คน
             </span>
           </div>
           <h3 className={`text-base font-extrabold mt-4 ${activeTab === 'enrollments' ? 'text-white' : 'text-slate-900'}`}>
@@ -248,7 +249,7 @@ export default function CourseApproverDashboard() {
               }`}
             >
               <Users className="w-4 h-4 text-[#CEF34B]" />
-              <span>อนุมัติการเข้าเรียน ({enrollments.length})</span>
+              <span>อนุมัติการเข้าเรียน ({enrollments.length} คน)</span>
             </button>
           </div>
         </div>
