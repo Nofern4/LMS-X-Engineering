@@ -24,7 +24,8 @@ import { Input } from '@/components/ui/Input';
 export default function GlobalCoursesCatalogPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
+  const [searchType, setSearchType] = useState<'all' | 'instructor' | 'course' | 'code' | 'class'>('all');
+  const [accessFilter, setAccessFilter] = useState<'ALL' | 'OPEN' | 'APPROVAL_REQUIRED'>('ALL');
   const [semester, setSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   // enrollmentStatuses: { [courseId]: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' }
@@ -38,7 +39,7 @@ export default function GlobalCoursesCatalogPage() {
   };
 
   useEffect(() => {
-    fetch(`/api/courses?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&semester=${encodeURIComponent(semester)}`)
+    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}`)
       .then((r) => r.json())
       .then(async (d) => {
         const list: any[] = d.courses || [];
@@ -65,7 +66,7 @@ export default function GlobalCoursesCatalogPage() {
         setEnrollmentStatuses(statuses);
       })
       .finally(() => setIsLoading(false));
-  }, [search, category, semester]);
+  }, [search, searchType, semester]);
 
   const handleEnroll = async (courseId: string) => {
     const user = getCurrentUser();
@@ -86,16 +87,6 @@ export default function GlobalCoursesCatalogPage() {
     }
   };
 
-  const categories = [
-    { label: 'ทั้งหมด', value: '' },
-    { label: 'วิศวกรรมคอมพิวเตอร์', value: 'วิศวกรรมคอมพิวเตอร์' },
-    { label: 'วิศวกรรมซอฟต์แวร์', value: 'วิศวกรรมซอฟต์แวร์' },
-    { label: 'ช่างกลโรงงาน', value: 'ช่างกลโรงงาน' },
-    { label: 'ช่างไฟฟ้ากำลัง', value: 'ช่างไฟฟ้ากำลัง' },
-    { label: 'เทคโนโลยีช่างยนต์', value: 'เทคโนโลยีช่างยนต์' },
-    { label: 'วิทยาการข้อมูล', value: 'วิทยาการข้อมูล' },
-  ];
-
   const courseImages: Record<string, string> = {
     'CS101': 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
     'SE302': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
@@ -105,8 +96,45 @@ export default function GlobalCoursesCatalogPage() {
     'AI401': 'https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80',
   };
 
-  const displayCourses = courses;
+  // Quick suggestion tags
+  const popularInstructors = [
+    'ผศ.ดร.วิชาญ สอนดี',
+    'อ.สมชาย พัฒนกิจ',
+    'ดร.นิธิภัทร ช่างคิด',
+    'อ.พิมพาภรณ์ วงศ์เทวา',
+  ];
 
+  const popularCourses = [
+    'การเขียนโปรแกรมคอมพิวเตอร์',
+    'วิศวกรรมซอฟต์แวร์',
+    'การเขียนแบบวิศวกรรมเครื่องกล',
+    'ระบบไฟฟ้าอุตสาหกรรม',
+    'เทคโนโลยียานยนต์สมัยใหม่',
+    'ปัญญาประดิษฐ์และ Machine Learning',
+  ];
+
+  const popularCodes = ['CS101', 'SE302', 'ME201', 'EE305', 'AUTO101', 'AI401'];
+
+  const getPlaceholder = () => {
+    switch (searchType) {
+      case 'instructor':
+        return 'พิมพ์ชื่ออาจารย์ผู้สอน เช่น ดร.วิชาญ, อ.สมชาย...';
+      case 'course':
+        return 'พิมพ์ชื่อรายวิชา เช่น การเขียนโปรแกรม, วิศวกรรม...';
+      case 'code':
+        return 'พิมพ์รหัสวิชาหรือตัวเลข เช่น CS101, 302, 201...';
+      case 'class':
+        return 'พิมพ์ชื่อคลาส กลุ่มเรียน หรือคำอธิบายวิชา...';
+      default:
+        return 'ค้นหาได้ทั้งชื่อวิชา, รหัสวิชา (CS101), หรือชื่ออาจารย์ผู้สอน...';
+    }
+  };
+
+  const displayCourses = courses.filter((c) => {
+    if (accessFilter === 'OPEN') return c.accessType === 'OPEN';
+    if (accessFilter === 'APPROVAL_REQUIRED') return c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED';
+    return true;
+  });
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
@@ -117,22 +145,61 @@ export default function GlobalCoursesCatalogPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               คลังรายวิชาทั้งหมด
             </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+              <Sparkles className="w-4 h-4 text-lime-600 flex-shrink-0" />
+              <span>ทุกรายวิชาเปิดกว้างให้นักศึกษาทุกสาขาวิชาเรียนได้ โดยไม่มีข้อจำกัดแยกสาขา</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+              <Unlock className="w-3.5 h-3.5" />
+              <span>วิชาเปิดเข้าเรียนได้ทันที</span>
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5" />
+              <span>วิชาคลาสปิดส่งคำขออนุมัติได้</span>
+            </span>
           </div>
         </div>
 
-        {/* Search Bar & Category Filter Pills */}
+        {/* Search Bar & Mode Selector */}
         <div className="space-y-4 pt-4 border-t border-slate-100">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div className="md:col-span-8">
+            <div className="md:col-span-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                เงื่อนไขการค้นหา:
+              </label>
+              <select
+                value={searchType}
+                onChange={(e) => setSearchType(e.target.value as any)}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-900 shadow-xs"
+              >
+                <option value="all">🔍 ทั้งหมด (ค้นทุกข้อมูล)</option>
+                <option value="instructor">👨‍🏫 ค้นตามชื่ออาจารย์</option>
+                <option value="course">📖 ค้นตามชื่อรายวิชา</option>
+                <option value="code">🔢 ค้นตามเลข / รหัสวิชา</option>
+                <option value="class">🏷️ ค้นตามคลาส / กลุ่มเรียน</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-6">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                คำค้นหา:
+              </label>
               <Input
-                placeholder="ค้นหาชื่อวิชา, รหัสวิชา (CS101, EE305), หรือชื่ออาจารย์ผู้สอน..."
+                placeholder={getPlaceholder()}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 leftIcon={<Search className="w-4 h-4 text-slate-400" />}
                 className="rounded-xl bg-slate-50 border-slate-200 text-xs py-2.5 px-4 text-slate-900 focus:bg-white focus:border-slate-900"
               />
             </div>
-            <div className="md:col-span-4">
+
+            <div className="md:col-span-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                ภาคการเรียน:
+              </label>
               <select
                 value={semester}
                 onChange={(e) => setSemester(e.target.value)}
@@ -145,22 +212,122 @@ export default function GlobalCoursesCatalogPage() {
             </div>
           </div>
 
-          {/* Segmented Pill Tabs */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-xs font-semibold text-slate-500 mr-1">หมวดหมู่:</span>
-            {categories.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setCategory(cat.value)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  category === cat.value
-                    ? 'bg-black text-[#CEF34B] shadow-xs'
-                    : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+          {/* Quick Selection Buttons */}
+          <div className="pt-2 border-t border-slate-100/80 space-y-2.5 text-xs">
+            {/* อาจารย์ */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-bold text-slate-500 mr-1 flex items-center gap-1">
+                👨‍🏫 ค้นด่วนชื่ออาจารย์:
+              </span>
+              {popularInstructors.map((inst) => (
+                <button
+                  key={inst}
+                  onClick={() => {
+                    setSearchType('instructor');
+                    setSearch(inst);
+                  }}
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    searchType === 'instructor' && search === inst
+                      ? 'bg-black text-[#CEF34B] shadow-xs'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  {inst}
+                </button>
+              ))}
+            </div>
+
+            {/* รายชื่อวิชา */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-bold text-slate-500 mr-1 flex items-center gap-1">
+                📖 ค้นด่วนรายชื่อวิชา:
+              </span>
+              {popularCourses.map((cName) => (
+                <button
+                  key={cName}
+                  onClick={() => {
+                    setSearchType('course');
+                    setSearch(cName);
+                  }}
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    searchType === 'course' && search === cName
+                      ? 'bg-black text-[#CEF34B] shadow-xs'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  {cName}
+                </button>
+              ))}
+            </div>
+
+            {/* รหัส/เลขวิชา */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-bold text-slate-500 mr-1 flex items-center gap-1">
+                🔢 ค้นด่วนรหัส/เลขวิชา:
+              </span>
+              {popularCodes.map((code) => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    setSearchType('code');
+                    setSearch(code);
+                  }}
+                  className={`px-3 py-1 rounded-full font-mono font-extrabold transition-all ${
+                    searchType === 'code' && search === code
+                      ? 'bg-black text-[#CEF34B] shadow-xs'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+              {(search || searchType !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    setSearchType('all');
+                  }}
+                  className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold ml-2"
+                >
+                  ล้างการค้นหา
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Access Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-500 mr-1">สิทธิ์การเข้าเรียน:</span>
+            <button
+              onClick={() => setAccessFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                accessFilter === 'ALL'
+                  ? 'bg-black text-[#CEF34B] shadow-xs'
+                  : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              ทั้งหมด ({courses.length})
+            </button>
+            <button
+              onClick={() => setAccessFilter('OPEN')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                accessFilter === 'OPEN'
+                  ? 'bg-black text-[#CEF34B] shadow-xs'
+                  : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              เข้าเรียนได้ทันที
+            </button>
+            <button
+              onClick={() => setAccessFilter('APPROVAL_REQUIRED')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                accessFilter === 'APPROVAL_REQUIRED'
+                  ? 'bg-black text-[#CEF34B] shadow-xs'
+                  : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              คลาสแบบปิด (ต้องขออนุมัติ)
+            </button>
           </div>
         </div>
       </div>
@@ -177,7 +344,7 @@ export default function GlobalCoursesCatalogPage() {
           {displayCourses.map((c: any) => {
             const coverImg = c.image || courseImages[c.code] || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80';
             const isClosed = c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED' || c.code === 'EE305' || c.code === 'ME201' || c.id === 'course-3' || c.id === 'course-2';
-            const instructorName = c.createdBy?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี';
+            const instructorName = c.createdBy?.name || c.instructors?.[0]?.instructor?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี';
             const lessonsCount = c._count?.materials ?? 0;
             const enrollmentsCount = c._count?.enrollments ?? 0;
 

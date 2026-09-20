@@ -7,21 +7,45 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
+    const searchType = searchParams.get('searchType') || 'all'; // 'all' | 'instructor' | 'course' | 'code' | 'class'
     const category = searchParams.get('category') || '';
     const semester = searchParams.get('semester') || '';
     const status = searchParams.get('status') || '';
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const limit = parseInt(searchParams.get('limit') || '100');
 
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (search) {
-      where.OR = [
-        { code: { contains: search } },
-        { title: { contains: search } },
-        { description: { contains: search } },
-      ];
+    if (search.trim()) {
+      const q = search.trim();
+      if (searchType === 'instructor') {
+        where.OR = [
+          { createdBy: { name: { contains: q } } },
+          { instructors: { some: { instructor: { name: { contains: q } } } } },
+        ];
+      } else if (searchType === 'course') {
+        where.title = { contains: q };
+      } else if (searchType === 'code') {
+        where.code = { contains: q };
+      } else if (searchType === 'class') {
+        where.OR = [
+          { title: { contains: q } },
+          { code: { contains: q } },
+          { description: { contains: q } },
+          { category: { contains: q } },
+        ];
+      } else {
+        // 'all'
+        where.OR = [
+          { code: { contains: q } },
+          { title: { contains: q } },
+          { description: { contains: q } },
+          { category: { contains: q } },
+          { createdBy: { name: { contains: q } } },
+          { instructors: { some: { instructor: { name: { contains: q } } } } },
+        ];
+      }
     }
     if (category) where.category = category;
     if (semester) where.semester = semester;

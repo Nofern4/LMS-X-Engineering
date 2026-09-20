@@ -42,7 +42,7 @@ const ALL_AVAILABLE_ROLES = [
   },
 ];
 
-export default function RegistrarUsersPage() {
+function RegistrarUsersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
@@ -872,6 +872,14 @@ export default function RegistrarUsersPage() {
         document.body
       )}
     </div>
+  );
+}
+
+export default function RegistrarUsersPage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-slate-500">กำลังโหลดข้อมูลผู้ใช้...</div>}>
+      <RegistrarUsersContent />
+    </React.Suspense>
   );
 }
 

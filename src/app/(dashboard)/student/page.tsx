@@ -37,7 +37,9 @@ export default function StudentDashboard() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCertOpen, setIsCertOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('ALL');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentSearchType, setStudentSearchType] = useState<'all' | 'instructor' | 'course' | 'code'>('all');
+  const [studentAccessFilter, setStudentAccessFilter] = useState<'ALL' | 'OPEN' | 'APPROVAL_REQUIRED'>('ALL');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [lastWatchedCourse, setLastWatchedCourse] = useState<any>(null);
 
@@ -49,6 +51,9 @@ export default function StudentDashboard() {
     'AUTO101': 'https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80',
     'AI401': 'https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80',
   };
+
+  const popularInstructors = ['ผศ.ดร.วิชาญ สอนดี', 'อ.สมชาย พัฒนกิจ', 'ดร.นิธิภัทร ช่างคิด'];
+  const popularCodes = ['CS101', 'SE302', 'ME201', 'EE305', 'AUTO101', 'AI401'];
 
   const loadData = () => {
     const userEmail = typeof window !== 'undefined'
@@ -109,27 +114,28 @@ export default function StudentDashboard() {
     return () => window.removeEventListener('role_updated', loadData);
   }, []);
 
+  // Filter courses without forcing department boundaries - all students can study/enroll
   const filteredCourses = courses.filter((c) => {
-    if (activeCategory === 'ALL') return true;
-    if (activeCategory === 'COMPUTER') {
-      return (
-        c.category?.includes('คอมพิวเตอร์') ||
-        c.category?.includes('ซอฟต์แวร์') ||
-        c.code?.includes('CS') ||
-        c.code?.includes('SE')
-      );
+    if (studentAccessFilter === 'OPEN' && c.accessType !== 'OPEN') return false;
+    if (studentAccessFilter === 'APPROVAL_REQUIRED' && (c.accessType !== 'APPROVAL_REQUIRED' && c.accessType !== 'CLOSED')) return false;
+
+    if (!studentSearch.trim()) return true;
+    const q = studentSearch.trim().toLowerCase();
+    const instructorName = (c.createdBy?.name || c.instructors?.[0]?.instructor?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี').toLowerCase();
+    const code = (c.code || '').toLowerCase();
+    const title = (c.title || '').toLowerCase();
+    const desc = (c.description || '').toLowerCase();
+
+    if (studentSearchType === 'instructor') {
+      return instructorName.includes(q);
     }
-    if (activeCategory === 'MECHANICAL') {
-      return (
-        c.category?.includes('กล') ||
-        c.category?.includes('ไฟฟ้า') ||
-        c.category?.includes('ยนต์') ||
-        c.code?.includes('ME') ||
-        c.code?.includes('EE') ||
-        c.code?.includes('AUTO')
-      );
+    if (studentSearchType === 'course') {
+      return title.includes(q);
     }
-    return true;
+    if (studentSearchType === 'code') {
+      return code.includes(q);
+    }
+    return code.includes(q) || title.includes(q) || instructorName.includes(q) || desc.includes(q);
   });
 
   const featuredCourses = filteredCourses.map((c) => ({
@@ -137,6 +143,8 @@ export default function StudentDashboard() {
     code: c.code,
     title: c.title,
     category: c.category,
+    accessType: c.accessType,
+    instructorName: c.createdBy?.name || c.instructors?.[0]?.instructor?.name || c.instructor || 'ผศ.ดร.วิชาญ สอนดี',
     materialsCount: c._count?.materials ?? 0,
     enrollmentsCount: c._count?.enrollments ?? 0,
     image: c.thumbnail || courseImages[c.code] || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
@@ -209,106 +217,228 @@ export default function StudentDashboard() {
       )}
 
       {/* 3. Featured Courses Grid with TOP CONTROLS & #CEF34B Lime Pills */}
-      <div className="bg-white rounded-3xl p-7 sm:p-9 border border-slate-200/90 shadow-xs space-y-7">
+      {/* 3. Featured Courses Grid with Search & Selection */}
+      <div className="bg-white rounded-3xl p-7 sm:p-9 border border-slate-200/90 shadow-xs space-y-6">
         
-        {/* Controls Bar AT THE TOP */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+        {/* Header & Open-to-all notification */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              รายวิชาแนะนำประจำภาคเรียน
+              รายวิชาที่เปิดสอนประจำภาคเรียน
             </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+              <Sparkles className="w-4 h-4 text-lime-600 flex-shrink-0" />
+              <span>ทุกวิชาสามารถเข้าเรียนหรือยื่นขออนุมัติได้ โดยไม่จำกัดสาขาวิชา</span>
+            </p>
           </div>
 
-          <div className="flex items-center gap-4 self-end md:self-auto">
-            {/* Category Filter Pills (Lime Green Active Accent) */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-full border border-slate-200 text-xs sm:text-sm font-bold">
+          <div className="flex items-center gap-2">
+            <Link href="/courses">
+              <button className="bg-black hover:bg-slate-800 text-[#CEF34B] text-xs font-bold rounded-full px-4 py-2 flex items-center gap-1.5 shadow-xs transition-all">
+                <span>ดูคลังวิชาทั้งหมด ({courses.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Student Search & Filter Controls */}
+        <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-4">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                เลือกรูปแบบค้นหา:
+              </label>
+              <select
+                value={studentSearchType}
+                onChange={(e) => setStudentSearchType(e.target.value as any)}
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-bold text-slate-900 focus:border-slate-900 shadow-xs"
+              >
+                <option value="all">🔍 ทั้งหมด (ค้นทุกฟิลด์)</option>
+                <option value="instructor">👨‍🏫 ค้นตามชื่ออาจารย์ผู้สอน</option>
+                <option value="course">📖 ค้นตามชื่อรายวิชา</option>
+                <option value="code">🔢 ค้นตามเลข / รหัสวิชา</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-8">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                คำค้นหา:
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={
+                    studentSearchType === 'instructor'
+                      ? 'พิมพ์ชื่ออาจารย์ผู้สอน เช่น วิชาญ, สมชาย...'
+                      : studentSearchType === 'course'
+                      ? 'พิมพ์ชื่อวิชา เช่น โปรแกรม, ออกแบบ, ไฟฟ้า...'
+                      : studentSearchType === 'code'
+                      ? 'พิมพ์รหัสวิชาหรือตัวเลข เช่น CS101, 302, 201...'
+                      : 'ค้นหาด้วยชื่ออาจารย์, ชื่อวิชา, หรือเลขรหัสวิชา...'
+                  }
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:border-slate-900 shadow-xs"
+                />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Filter Tags & Access Filter */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60 text-xs">
+            {/* Quick Click Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-bold text-slate-500 mr-1">ค้นด่วนอาจารย์:</span>
+              {popularInstructors.map((inst) => (
+                <button
+                  key={inst}
+                  onClick={() => {
+                    setStudentSearchType('instructor');
+                    setStudentSearch(inst);
+                  }}
+                  className={`px-2.5 py-1 rounded-full font-bold transition-all ${
+                    studentSearchType === 'instructor' && studentSearch === inst
+                      ? 'bg-black text-[#CEF34B]'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {inst}
+                </button>
+              ))}
+
+              <span className="font-bold text-slate-500 ml-2 mr-1">รหัสวิชา:</span>
+              {popularCodes.map((code) => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    setStudentSearchType('code');
+                    setStudentSearch(code);
+                  }}
+                  className={`px-2 py-0.5 rounded-md font-mono font-bold transition-all ${
+                    studentSearchType === 'code' && studentSearch === code
+                      ? 'bg-black text-[#CEF34B]'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+
+              {(studentSearch || studentSearchType !== 'all') && (
+                <button
+                  onClick={() => {
+                    setStudentSearch('');
+                    setStudentSearchType('all');
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 font-bold hover:bg-rose-200 ml-1"
+                >
+                  ล้างคำค้น
+                </button>
+              )}
+            </div>
+
+            {/* Access Filter */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-full border border-slate-200">
               <button
-                onClick={() => setActiveCategory('ALL')}
-                className={`px-4 py-1.5 rounded-full transition-all ${
-                  activeCategory === 'ALL' ? 'bg-[#CEF34B] text-black font-extrabold shadow-xs' : 'text-slate-700 hover:text-black'
+                onClick={() => setStudentAccessFilter('ALL')}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  studentAccessFilter === 'ALL' ? 'bg-[#CEF34B] text-black shadow-xs' : 'text-slate-600 hover:text-black'
                 }`}
               >
                 ทั้งหมด
               </button>
               <button
-                onClick={() => setActiveCategory('COMPUTER')}
-                className={`px-4 py-1.5 rounded-full transition-all ${
-                  activeCategory === 'COMPUTER' ? 'bg-[#CEF34B] text-black font-extrabold shadow-xs' : 'text-slate-700 hover:text-black'
+                onClick={() => setStudentAccessFilter('OPEN')}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  studentAccessFilter === 'OPEN' ? 'bg-[#CEF34B] text-black shadow-xs' : 'text-slate-600 hover:text-black'
                 }`}
               >
-                คอมพิวเตอร์
+                เปิดทั่วไป
               </button>
               <button
-                onClick={() => setActiveCategory('MECHANICAL')}
-                className={`px-4 py-1.5 rounded-full transition-all ${
-                  activeCategory === 'MECHANICAL' ? 'bg-[#CEF34B] text-black font-extrabold shadow-xs' : 'text-slate-700 hover:text-black'
+                onClick={() => setStudentAccessFilter('APPROVAL_REQUIRED')}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  studentAccessFilter === 'APPROVAL_REQUIRED' ? 'bg-[#CEF34B] text-black shadow-xs' : 'text-slate-600 hover:text-black'
                 }`}
               >
-                ช่างกล
-              </button>
-            </div>
-
-            {/* Prev/Next Arrow Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrevSlide}
-                className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-700 hover:bg-black hover:text-[#CEF34B] flex items-center justify-center transition-all shadow-xs"
-                title="ย้อนกลับ"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleNextSlide}
-                className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-700 hover:bg-black hover:text-[#CEF34B] flex items-center justify-center transition-all shadow-xs"
-                title="ถัดไป"
-              >
-                <ChevronRight className="w-5 h-5" />
+                คลาสปิด (ขออนุมัติ)
               </button>
             </div>
           </div>
         </div>
 
         {/* Courses Grid with Lime Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredCourses.map((c) => (
-            <div
-              key={c.id}
-              className="group relative rounded-2xl overflow-hidden shadow-sm border border-slate-200 h-[340px] flex flex-col justify-between p-5 text-white transition-all duration-300 hover:-translate-y-1 hover:shadow-md bg-slate-900"
-            >
-              {/* Background Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
-                style={{ backgroundImage: `url('${c.image}')` }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20" />
+        {featuredCourses.length === 0 ? (
+          <div className="bg-slate-50 rounded-2xl p-10 text-center border border-slate-200">
+            <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-700 font-bold text-sm">ไม่พบรายวิชาที่ตรงกับการค้นหา</p>
+            <p className="text-slate-400 text-xs mt-1">ลองเปลี่ยนคำค้นหา หรือกด "ล้างคำค้น" เพื่อดูทุกวิชา</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featuredCourses.map((c) => {
+              const isClosed = c.accessType === 'APPROVAL_REQUIRED' || c.accessType === 'CLOSED';
+              return (
+                <div
+                  key={c.id}
+                  className="group relative rounded-2xl overflow-hidden shadow-sm border border-slate-200 h-[340px] flex flex-col justify-between p-5 text-white transition-all duration-300 hover:-translate-y-1 hover:shadow-md bg-slate-900"
+                >
+                  {/* Background Image */}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 opacity-100"
+                    style={{ backgroundImage: `url('${c.image}')` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-black/20" />
 
-              {/* Top Tag */}
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="px-3 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs sm:text-sm">
-                  {c.code}
-                </span>
-              </div>
+                  {/* Top Tag: Code + Access Icon */}
+                  <div className="relative z-10 flex items-center justify-between">
+                    <span className="px-3 py-1 rounded-full bg-[#CEF34B] text-black font-mono font-extrabold text-xs sm:text-sm">
+                      {c.code}
+                    </span>
 
-              {/* Bottom Card Title & Info */}
-              <div className="relative z-10 space-y-2">
-                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{c.category}</p>
-                <h3 className="text-lg font-bold text-white leading-snug group-hover:text-[#CEF34B] transition-colors line-clamp-2">
-                  {c.title}
-                </h3>
-                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-300 pt-2 border-t border-white/20">
-                  <span className="flex items-center gap-1 text-[#CEF34B] font-bold">
-                    <BookOpen className="w-4 h-4 text-[#CEF34B]" />
-                    <span>{c.materialsCount} บทเรียน</span>
-                  </span>
-                  <Link href={`/learning/${c.id}`} className="text-[#CEF34B] font-extrabold hover:underline flex items-center gap-1.5">
-                    <span>เข้าเรียน</span>
-                    <ArrowRight className="w-4 h-4 text-[#CEF34B]" />
-                  </Link>
+                    {isClosed ? (
+                      <span
+                        title="คลาสแบบปิด (ต้องขออนุมัติ)"
+                        className="w-7 h-7 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-md"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      </span>
+                    ) : (
+                      <span
+                        title="วิชาเปิดทั่วไป (เข้าเรียนได้ทันที)"
+                        className="w-7 h-7 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-md"
+                      >
+                        <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bottom Card Title & Info */}
+                  <div className="relative z-10 space-y-1.5">
+                    <p className="text-[11px] font-semibold text-slate-300 line-clamp-1">
+                      อาจารย์: <span className="text-white font-bold">{c.instructorName}</span>
+                    </p>
+                    <h3 className="text-base font-bold text-white leading-snug group-hover:text-[#CEF34B] transition-colors line-clamp-2">
+                      {c.title}
+                    </h3>
+                    <div className="flex items-center justify-between text-xs text-slate-300 pt-2 border-t border-white/20">
+                      <span className="flex items-center gap-1 text-[#CEF34B] font-bold">
+                        <BookOpen className="w-3.5 h-3.5 text-[#CEF34B]" />
+                        <span>{c.materialsCount} บทเรียน</span>
+                      </span>
+                      <Link href={`/courses/${c.id}`} className="text-[#CEF34B] font-extrabold hover:underline flex items-center gap-1">
+                        <span>ดูวิชา</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-[#CEF34B]" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Bottom Action Link (Lime Pill Button) */}
         <div className="flex items-center justify-center pt-3">

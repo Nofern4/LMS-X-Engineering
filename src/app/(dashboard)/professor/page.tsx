@@ -35,7 +35,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 
-export default function ProfessorDashboard() {
+function ProfessorDashboardContent() {
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [selectedCourseCode, setSelectedCourseCode] = useState<string>('CS101');
@@ -55,7 +55,7 @@ export default function ProfessorDashboard() {
   const [createStep, setCreateStep] = useState<1 | 2>(1);
   const [newCode, setNewCode] = useState('');
   const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState('วิศวกรรมคอมพิวเตอร์');
+  const [newCategory, setNewCategory] = useState('ทั่วไป (เปิดกว้างทุกสาขาวิชา)');
   const [newDescription, setNewDescription] = useState('');
   const [newAccessType, setNewAccessType] = useState<'APPROVAL_REQUIRED' | 'OPEN'>('APPROVAL_REQUIRED');
 
@@ -674,18 +674,21 @@ export default function ProfessorDashboard() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-900 mb-1">
-                  หมวดหมู่ / สาขาวิชา (Department / Category)
+                  หมวดหมู่รายวิชา (ทุกสาขาวิชาเรียนได้)
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-slate-900"
                 >
-                  <option value="วิศวกรรมคอมพิวเตอร์">วิศวกรรมคอมพิวเตอร์</option>
-                  <option value="ช่างกลโรงงาน">ช่างกลโรงงาน</option>
-                  <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
-                  <option value="เทคโนโลยีช่างยนต์">เทคโนโลยีช่างยนต์</option>
+                  <option value="ทั่วไป (เปิดกว้างทุกสาขาวิชา)">ทั่วไป (เปิดกว้างทุกสาขาวิชาเรียนได้)</option>
+                  <option value="วิชาแกนวิศวกรรม/ช่างอุตสาหกรรม">วิชาแกนวิศวกรรม/ช่างอุตสาหกรรม (เปิดทุกสาขา)</option>
+                  <option value="วิชาเลือกเสรี">วิชาเลือกเสรี (เปิดทุกสาขา)</option>
+                  <option value="วิชาปฏิบัติการและโครงงาน">วิชาปฏิบัติการและโครงงาน (เปิดทุกสาขา)</option>
                 </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  * ทุกรายวิชาเปิดกว้างให้นักศึกษาทุกสาขาวิชาเข้าเรียนได้ หรือยื่นขออนุมัติได้โดยไม่มีการจำกัดเฉพาะสาขา
+                </p>
               </div>
 
               <div>
@@ -879,5 +882,13 @@ export default function ProfessorDashboard() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+export default function ProfessorDashboard() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-slate-500">กำลังโหลดข้อมูลอาจารย์...</div>}>
+      <ProfessorDashboardContent />
+    </React.Suspense>
   );
 }
