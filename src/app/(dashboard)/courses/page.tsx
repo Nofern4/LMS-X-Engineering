@@ -292,10 +292,6 @@ export default function GlobalCoursesCatalogPage() {
                       <BookOpen className="w-3.5 h-3.5 text-slate-700" />
                       <span>{lessonsCount} บทเรียน</span>
                     </span>
-                    <span className="inline-flex items-center gap-1 text-slate-500 font-semibold">
-                      <Users className="w-3.5 h-3.5" />
-                      <span>{enrollmentsCount} ผู้เรียน</span>
-                    </span>
                   </div>
 
                 {(() => {

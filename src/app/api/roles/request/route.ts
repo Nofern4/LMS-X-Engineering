@@ -96,13 +96,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `ผู้ใช้งานไม่ได้ถือครองบทบาท ${roleName} อยู่ในปัจจุบัน` }, { status: 400 });
       }
 
-      // Check if user is trying to remove STUDENT and has no other roles
-      if (roleName === 'STUDENT' && currentRoleNames.length === 1) {
-        return NextResponse.json({ error: 'ไม่สามารถยกเลิกบทบาทนักเรียนได้ เนื่องจากเป็นบทบาทพื้นฐานเพียงบทบาทเดียวของคุณ' }, { status: 400 });
+      // Check if user is trying to remove their only remaining role
+      if (currentRoleNames.length <= 1) {
+        return NextResponse.json({ error: 'ไม่สามารถยกเลิกบทบาทสุดท้ายได้ เนื่องจากต้องมีอย่างน้อย 1 บทบาทในระบบ' }, { status: 400 });
       }
 
+      const matchedRoleName = currentRoleNames.includes(roleName)
+        ? roleName
+        : (roleName === 'COURSE_CREATOR_APPROVER' && currentRoleNames.includes('APPROVER'))
+        ? 'APPROVER'
+        : (roleName === 'APPROVER' && currentRoleNames.includes('COURSE_CREATOR_APPROVER'))
+        ? 'COURSE_CREATOR_APPROVER'
+        : roleName;
+
       // Find role record
-      const dbRole = await prisma.role.findUnique({ where: { name: roleName } });
+      const dbRole = await prisma.role.findFirst({
+        where: {
+          OR: [
+            { name: matchedRoleName },
+            ...(matchedRoleName === 'COURSE_CREATOR_APPROVER' ? [{ name: 'APPROVER' }] : []),
+            ...(matchedRoleName === 'APPROVER' ? [{ name: 'COURSE_CREATOR_APPROVER' }] : [])
+          ]
+        }
+      });
       if (dbRole) {
         await prisma.userRole.deleteMany({
           where: {
