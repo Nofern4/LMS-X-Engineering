@@ -32,7 +32,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
     }
 
-    if (!user || (!user.roles?.includes('PROFESSOR') && !user.roles?.includes('ADMIN'))) {
+    const allowedRoles = ['PROFESSOR', 'ADMIN', 'COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'REGISTRAR'];
+    const hasPermission = user?.roles?.some((r: string) => allowedRoles.includes(r));
+    if (!user || !hasPermission) {
       return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อนุมัตินักเรียนในรายวิชานี้' }, { status: 403 });
     }
 
