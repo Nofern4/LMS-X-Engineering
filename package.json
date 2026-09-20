@@ -27,7 +27,6 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.10",
