@@ -118,10 +118,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'กรุณากรอกชื่อรายวิชาให้ครบถ้วน' }, { status: 400 });
     }
 
-    // Check code uniqueness
-    const existing = await prisma.course.findUnique({ where: { code } });
-    if (existing) {
-      return NextResponse.json({ error: 'รหัสวิชานี้มีอยู่ในระบบแล้ว' }, { status: 400 });
+    // Auto-resolve code uniqueness if duplicate
+    let finalCode = code;
+    let existing = await prisma.course.findUnique({ where: { code: finalCode } });
+    let counter = 1;
+    while (existing) {
+      finalCode = `XK-${Math.floor(100 + Math.random() * 900)}${counter > 1 ? `-${counter}` : ''}`;
+      existing = await prisma.course.findUnique({ where: { code: finalCode } });
+      counter++;
     }
 
     // Find valid user in DB
@@ -160,7 +164,7 @@ export async function POST(request: Request) {
 
     const course = await prisma.course.create({
       data: {
-        code,
+        code: finalCode,
         title,
         description: description?.trim() || '',
         category: category || 'ทั่วไป',
@@ -188,9 +192,18 @@ export async function POST(request: Request) {
       },
     });
 
-    await logAuditEvent(user.id, 'CREATE_COURSE', `COURSE:${course.id}`, undefined, { code, title });
+    await logAuditEvent(user.id, 'CREATE_COURSE', `COURSE:${course.id}`, undefined, { code: finalCode, title });
 
-    return NextResponse.json({ message: 'สร้างรายวิชาฉบับร่างสำเร็จ', course });
+    // Serialize BigInt fields (fileSize) to string for JSON compatibility
+    const serializedCourse = {
+      ...course,
+      materials: (course.materials || []).map((m: any) => ({
+        ...m,
+        fileSize: m.fileSize ? m.fileSize.toString() : '0',
+      })),
+    };
+
+    return NextResponse.json({ message: 'สร้างรายวิชาฉบับร่างสำเร็จ', course: serializedCourse });
   } catch (error: any) {
     console.error('Create course error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });

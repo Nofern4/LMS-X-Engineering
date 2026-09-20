@@ -381,7 +381,7 @@ function ProfessorDashboardContent() {
 
     setIsSubmittingCourse(true);
     try {
-      const codeToUse = newCode.trim() || `XK-${Math.floor(100 + Math.random() * 900)}`;
+      const codeToUse = newCode.trim() || `XK-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
 
       let userPayload: any = { id: 'prof-1', roles: ['PROFESSOR'] };
       try {
