@@ -7,7 +7,8 @@ const nextConfig = {
     },
   },
   outputFileTracingIncludes: {
-    '**/*': ['./prisma/dev.db', './prisma/schema.prisma'],
+    '/api/**/*': ['./prisma/dev.db', './prisma/schema.prisma'],
+    '/*': ['./prisma/dev.db', './prisma/schema.prisma'],
   },
 };
 
