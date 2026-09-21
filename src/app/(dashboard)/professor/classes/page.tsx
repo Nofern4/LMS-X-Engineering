@@ -112,11 +112,25 @@ export default function ProfessorClassesPage() {
 
   useEffect(() => {
     fetchClasses();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'last_course_update' || e.key === 'course_updated') {
+        fetchClasses();
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchClasses();
+      }
+    };
     window.addEventListener('course_updated', fetchClasses);
     window.addEventListener('focus', fetchClasses);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       window.removeEventListener('course_updated', fetchClasses);
       window.removeEventListener('focus', fetchClasses);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 

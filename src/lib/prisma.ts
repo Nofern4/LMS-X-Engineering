@@ -7,8 +7,8 @@ if (process.env.VERCEL) {
   const tmpDbPath = path.join('/tmp', 'dev.db');
   if (!fs.existsSync(tmpDbPath)) {
     const candidates = [
-      path.join(process.cwd(), 'public', 'data', 'dev.db'),
       path.join(process.cwd(), 'prisma', 'dev.db'),
+      path.join(process.cwd(), 'public', 'data', 'dev.db'),
       path.join(process.cwd(), 'dev.db'),
       path.join(__dirname, 'public', 'data', 'dev.db'),
       path.join(__dirname, 'prisma', 'dev.db'),

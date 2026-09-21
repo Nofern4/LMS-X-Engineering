@@ -275,10 +275,19 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
         const demoEmail = typeof window !== 'undefined' ? localStorage.getItem('demo_user_email') : null;
         const userEmail = currentUser?.email || demoEmail || 'student@student.x-karchang.ac.th';
 
-        // Check if staff, instructor, approver, admin
+        // Check if staff, instructor, approver, admin, or creator
+        const isCourseCreatorOrInstructor = Boolean(
+          (c?.createdById && currentUser?.id && c.createdById === currentUser.id) ||
+          (c?.createdBy?.email && userEmail && c.createdBy.email.toLowerCase() === userEmail.toLowerCase()) ||
+          c?.instructors?.some((i: any) =>
+            (i.instructorId && currentUser?.id && i.instructorId === currentUser.id) ||
+            (i.instructor?.email && userEmail && i.instructor.email.toLowerCase() === userEmail.toLowerCase())
+          )
+        );
+
         const isStaffOrApprover = Boolean(
           currentUser?.roles?.some((r: string) =>
-            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR'].includes(r)
+            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR', 'TEACHER'].includes(r)
           ) ||
           userEmail === 'course.approver@x-karchang.ac.th' ||
           userEmail === 'professor@x-karchang.ac.th' ||
@@ -286,7 +295,7 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
           userEmail === 'director@x-karchang.ac.th'
         );
 
-        if (isStaffOrApprover || c?.accessType === 'OPEN' || c?.accessType === 'PUBLIC') {
+        if (isStaffOrApprover || isCourseCreatorOrInstructor || c?.accessType === 'OPEN' || c?.accessType === 'PUBLIC') {
           setIsApproved(true);
           setEnrollmentStatus('APPROVED');
         } else {

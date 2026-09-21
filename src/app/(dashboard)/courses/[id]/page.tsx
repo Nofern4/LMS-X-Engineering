@@ -39,10 +39,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         const demoEmail = typeof window !== 'undefined' ? localStorage.getItem('demo_user_email') : null;
         const userEmail = sessionUser?.email || demoEmail || 'student@student.x-karchang.ac.th';
 
-        // Check if user is staff/instructor/approver/admin
+        // Check if user is staff/instructor/approver/admin or creator
+        const isCourseCreatorOrInstructor = Boolean(
+          (data.course?.createdById && sessionUser?.id && data.course.createdById === sessionUser.id) ||
+          (data.course?.createdBy?.email && userEmail && data.course.createdBy.email.toLowerCase() === userEmail.toLowerCase()) ||
+          data.course?.instructors?.some((i: any) =>
+            (i.instructorId && sessionUser?.id && i.instructorId === sessionUser.id) ||
+            (i.instructor?.email && userEmail && i.instructor.email.toLowerCase() === userEmail.toLowerCase())
+          )
+        );
+
         const isStaffOrApprover = Boolean(
           sessionUser?.roles?.some((r: string) =>
-            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR'].includes(r)
+            ['PROFESSOR', 'ADMIN', 'DIRECTOR', 'CONTENT_APPROVER', 'COURSE_CREATOR_APPROVER', 'REGISTRAR', 'TEACHER'].includes(r)
           ) ||
           demoEmail === 'course.approver@x-karchang.ac.th' ||
           demoEmail === 'professor@x-karchang.ac.th' ||
@@ -50,7 +59,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           demoEmail === 'director@x-karchang.ac.th'
         );
 
-        if (isStaffOrApprover || data.course?.accessType === 'OPEN') {
+        if (isStaffOrApprover || isCourseCreatorOrInstructor || data.course?.accessType === 'OPEN') {
           setEnrollmentStatus('APPROVED');
           return;
         }
