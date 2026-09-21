@@ -61,16 +61,31 @@ export default function CourseApproverDashboard() {
       ]);
       const [cData, eData] = await Promise.all([cRes.json(), eRes.json()]);
 
-      // Read latest processed decisions from localStorage
-      let processedIds = new Set<string>();
+      // Read latest processed decisions from localStorage — only used to avoid brief flicker
+      // when a decision was just confirmed. We ALWAYS show items that are still PENDING in the DB,
+      // because the server is the source of truth (handles API errors, resubmissions, etc.)
+      let recentlyProcessedIds = new Set<string>();
       try {
         const savedHistory: DecisionHistoryItem[] = JSON.parse(localStorage.getItem('approver_decision_history') || '[]');
-        savedHistory.forEach((h) => processedIds.add(h.id));
+        // Only exclude items processed within the last 30 seconds (prevents flicker from optimistic update)
+        const RECENTLY_THRESHOLD = 30_000;
+        const now = Date.now();
+        savedHistory.forEach((h) => {
+          // Parse timestamp — if recent, add to exclusion set
+          try {
+            const ts = new Date(h.timestamp).getTime();
+            if (now - ts < RECENTLY_THRESHOLD) {
+              recentlyProcessedIds.add(h.id);
+            }
+          } catch {
+            // If timestamp can't be parsed, skip exclusion — let server data win
+          }
+        });
       } catch {}
 
-      // Filter out any items that have already been approved or rejected
-      const pendingCourses = (cData.courses || []).filter((c: any) => !processedIds.has(c.id) && c.status === 'PENDING_APPROVAL');
-      const pendingEnrollments = (eData.enrollments || []).filter((e: any) => !processedIds.has(e.id) && e.status === 'PENDING');
+      // Show all items still PENDING in the DB; only suppress very recently acted-on items
+      const pendingCourses = (cData.courses || []).filter((c: any) => !recentlyProcessedIds.has(c.id) && c.status === 'PENDING_APPROVAL');
+      const pendingEnrollments = (eData.enrollments || []).filter((e: any) => !recentlyProcessedIds.has(e.id) && e.status === 'PENDING');
 
       if (!isActionPendingRef.current) {
         setCourses(pendingCourses);
@@ -135,13 +150,7 @@ export default function CourseApproverDashboard() {
       subtitle,
       action: targetAction,
       reason: targetReason || undefined,
-      timestamp: new Date().toLocaleString('th-TH', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      timestamp: new Date().toISOString(),
     };
 
     const nextHistory = [newRecord, ...decisionHistory.filter((h) => h.id !== targetItem.id)];
@@ -679,7 +688,7 @@ export default function CourseApproverDashboard() {
                       <td className="p-4 text-slate-600 font-mono text-[11px]">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{item.timestamp}</span>
+                          <span>{new Date(item.timestamp).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </td>
                       <td className="p-4 pr-6 text-slate-600 text-[11px]">

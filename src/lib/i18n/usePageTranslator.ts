@@ -8,157 +8,217 @@ import { DEFAULT_LANGUAGE } from './languages';
 const SORTED_KEYS = Object.keys(TRANSLATIONS).sort((a, b) => b.length - a.length);
 const THAI_REGEX = /[\u0E00-\u0E7F]/;
 
-const ORIGINAL_TEXT_MAP = new WeakMap<Node, string>();
-const LAST_TRANSLATED_MAP = new WeakMap<Node, string>();
-const ORIGINAL_ATTR_MAP = new WeakMap<Element, Record<string, string>>();
-const LAST_TRANSLATED_ATTR_MAP = new WeakMap<Element, Record<string, string>>();
+// Store original Thai text in a WeakMap keyed on the node
+// key = original Thai value, resets whenever React pushes new Thai content
+const ORIGINAL_MAP = new WeakMap<Node, string>();
+
+// The last lang that was applied to this node (to avoid redundant DOM writes)
+const LAST_LANG_MAP = new WeakMap<Node, string>();
+const LAST_VAL_MAP = new WeakMap<Node, string>();
 
 let originalDocTitle: string | null = null;
 
+/**
+ * Translate a Thai string into targetLang.
+ * Works by repeatedly matching the longest-known phrase and replacing it.
+ * Thai fragments with NO translation entry are replaced with an empty string
+ * rather than left in Thai — so the result is never a mix of Thai + target lang.
+ */
 function translateString(text: string, targetLang: string): string {
-  if (!text || targetLang === 'th' || !THAI_REGEX.test(text)) return text;
+  if (!text || targetLang === 'th') return text;
+  if (!THAI_REGEX.test(text)) return text; // not Thai, pass through
+
   let translated = text;
   for (let i = 0; i < SORTED_KEYS.length; i++) {
     const key = SORTED_KEYS[i];
-    if (translated.includes(key) && TRANSLATIONS[key][targetLang]) {
+    if (translated.includes(key) && TRANSLATIONS[key]?.[targetLang]) {
       translated = translated.split(key).join(TRANSLATIONS[key][targetLang]);
     }
   }
+
+  // If the result still contains Thai characters, it means there were phrases
+  // that had no translation entry. Remove the remaining Thai fragments so we
+  // never show a mix like "承認待ち รออนุมัติ" — instead show just "承認待ち".
+  if (THAI_REGEX.test(translated)) {
+    // Remove contiguous Thai word groups, keeping surrounding non-Thai content
+    translated = translated.replace(/[\u0E00-\u0E7F\s]*[\u0E00-\u0E7F][\u0E00-\u0E7F\s]*/g, (match) => {
+      // Keep if it's only whitespace
+      return match.replace(/[\u0E00-\u0E7F]+/g, '').trim();
+    }).replace(/\s{2,}/g, ' ').trim();
+  }
+
   return translated;
 }
 
 export function usePageTranslator() {
   useEffect(() => {
     let isTranslating = false;
-    let debounceTimer: any = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const applyTranslation = () => {
-      if (typeof window === 'undefined' || !document.body) return;
-      const currentLang = localStorage.getItem('app_lang') || DEFAULT_LANGUAGE;
+    const getLang = (): string =>
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('app_lang') : null) ||
+      DEFAULT_LANGUAGE;
 
-      // Update HTML lang attribute
-      try {
-        document.documentElement.lang = currentLang;
-      } catch (e) {}
+    /** Translate a single text node */
+    const translateTextNode = (node: Node, lang: string) => {
+      const raw = node.nodeValue || '';
+      if (!raw.trim()) return;
 
-      // Translate document.title
-      try {
-        if (originalDocTitle === null && document.title) {
-          originalDocTitle = document.title;
+      const currentIsThai = THAI_REGEX.test(raw);
+
+      // ─── Determine the "original Thai" for this node ───────────────────
+      let original = ORIGINAL_MAP.get(node);
+
+      if (original === undefined) {
+        // First time seeing this node
+        original = raw;
+        ORIGINAL_MAP.set(node, original);
+      } else if (currentIsThai) {
+        // React re-rendered with new Thai content (e.g. after data fetch)
+        const lastVal = LAST_VAL_MAP.get(node);
+        if (raw !== lastVal) {
+          // React pushed genuinely new Thai text — update origin
+          original = raw;
+          ORIGINAL_MAP.set(node, original);
         }
-        if (originalDocTitle) {
-          if (currentLang === 'th') {
-            document.title = originalDocTitle;
+      } else {
+        // Node currently holds a non-Thai translated value
+        // If the original we stored IS Thai, keep using it as the source
+        if (!THAI_REGEX.test(original)) {
+          // original itself is not Thai — nothing to translate
+          return;
+        }
+        // Use the stored Thai original below
+      }
+
+      // ─── Apply or revert ────────────────────────────────────────────────
+      if (lang === 'th') {
+        // Restore to original Thai
+        if (node.nodeValue !== original) {
+          node.nodeValue = original;
+        }
+        LAST_VAL_MAP.set(node, original);
+        LAST_LANG_MAP.set(node, lang);
+        return;
+      }
+
+      // Translate from original Thai
+      const translated = translateString(original, lang);
+
+      if (node.nodeValue !== translated) {
+        node.nodeValue = translated;
+      }
+      LAST_VAL_MAP.set(node, translated);
+      LAST_LANG_MAP.set(node, lang);
+    };
+
+    /** Translate placeholder/title/aria-label attributes on an element */
+    const translateAttrs = (el: Element, lang: string) => {
+      const ATTRS = ['placeholder', 'title', 'aria-label'];
+      for (const attr of ATTRS) {
+        const val = el.getAttribute(attr);
+        if (!val) continue;
+
+        const dataKey = `data-orig-${attr}`;
+        let orig = el.getAttribute(dataKey);
+
+        if (!orig) {
+          if (THAI_REGEX.test(val)) {
+            orig = val;
+            el.setAttribute(dataKey, orig);
           } else {
-            document.title = translateString(originalDocTitle, currentLang);
+            continue;
           }
+        } else if (THAI_REGEX.test(val) && val !== orig) {
+          // React refreshed with new Thai attr value
+          orig = val;
+          el.setAttribute(dataKey, orig);
         }
-      } catch (e) {}
 
-      isTranslating = true;
-
-      const walkTextNodes = (node: Node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const currentVal = node.nodeValue || '';
-          if (!currentVal.trim()) return;
-
-          let original = ORIGINAL_TEXT_MAP.get(node);
-          const hasThai = THAI_REGEX.test(currentVal);
-
-          if (original === undefined) {
-            original = currentVal;
-            ORIGINAL_TEXT_MAP.set(node, original);
-          } else if (hasThai) {
-            const lastTrans = LAST_TRANSLATED_MAP.get(node);
-            // If React re-rendered with new Thai content
-            if (currentVal !== original && currentVal !== lastTrans) {
-              original = currentVal;
-              ORIGINAL_TEXT_MAP.set(node, original);
-            }
-          }
-
-          if (currentLang === 'th') {
-            if (node.nodeValue !== original) {
-              node.nodeValue = original;
-            }
-            LAST_TRANSLATED_MAP.set(node, original);
-            return;
-          }
-
-          // Translate from original Thai text
-          const translated = translateString(original, currentLang);
-
-          if (node.nodeValue !== translated) {
-            node.nodeValue = translated;
-          }
-          LAST_TRANSLATED_MAP.set(node, translated);
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          if (['SCRIPT', 'STYLE', 'CODE'].includes(el.tagName)) return;
-
-          // Attributes: placeholder, title, aria-label
-          const targetAttrs = ['placeholder', 'title', 'aria-label'];
-          let origAttrs = ORIGINAL_ATTR_MAP.get(el);
-          if (!origAttrs) {
-            origAttrs = {};
-            ORIGINAL_ATTR_MAP.set(el, origAttrs);
-          }
-          let lastAttrs = LAST_TRANSLATED_ATTR_MAP.get(el);
-          if (!lastAttrs) {
-            lastAttrs = {};
-            LAST_TRANSLATED_ATTR_MAP.set(el, lastAttrs);
-          }
-
-          for (const attr of targetAttrs) {
-            const val = el.getAttribute(attr);
-            if (val) {
-              const hasThai = THAI_REGEX.test(val);
-              if (origAttrs[attr] === undefined) {
-                origAttrs[attr] = val;
-              } else if (hasThai && val !== origAttrs[attr] && val !== lastAttrs[attr]) {
-                origAttrs[attr] = val;
-              }
-
-              const orig = origAttrs[attr];
-              if (currentLang === 'th') {
-                if (val !== orig) el.setAttribute(attr, orig);
-                lastAttrs[attr] = orig;
-              } else {
-                const trans = translateString(orig, currentLang);
-                if (val !== trans) el.setAttribute(attr, trans);
-                lastAttrs[attr] = trans;
-              }
-            }
-          }
-
-          // Traverse child nodes
-          for (let i = 0; i < el.childNodes.length; i++) {
-            walkTextNodes(el.childNodes[i]);
-          }
-        }
-      };
-
-      try {
-        walkTextNodes(document.body);
-      } catch (e) {
-        console.error('Translation walk error:', e);
-      } finally {
-        setTimeout(() => {
-          isTranslating = false;
-        }, 50);
+        const target = lang === 'th' ? orig : translateString(orig, lang);
+        if (val !== target) el.setAttribute(attr, target);
       }
     };
 
-    // Run translation immediately
+    /** Walk the DOM tree and translate every text node + attribute */
+    const walk = (node: Node, lang: string) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        translateTextNode(node, lang);
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+      const el = node as HTMLElement;
+      const tag = el.tagName;
+
+      // Skip non-content elements
+      if (['SCRIPT', 'STYLE', 'CODE', 'PRE', 'NOSCRIPT', 'IFRAME'].includes(tag)) return;
+
+      // Translate attributes
+      translateAttrs(el, lang);
+
+      // Recurse into children
+      for (let i = 0; i < el.childNodes.length; i++) {
+        walk(el.childNodes[i], lang);
+      }
+    };
+
+    const applyTranslation = () => {
+      if (typeof window === 'undefined' || !document.body) return;
+      const lang = getLang();
+
+      // Update <html lang="...">
+      try { document.documentElement.lang = lang; } catch (_) {}
+
+      // Translate <title>
+      try {
+        if (originalDocTitle === null && document.title) originalDocTitle = document.title;
+        if (originalDocTitle) {
+          document.title = lang === 'th' ? originalDocTitle : translateString(originalDocTitle, lang);
+        }
+      } catch (_) {}
+
+      isTranslating = true;
+      try {
+        walk(document.body, lang);
+      } catch (e) {
+        console.error('[i18n] Translation walk error:', e);
+      } finally {
+        setTimeout(() => { isTranslating = false; }, 60);
+      }
+    };
+
+    // Run immediately
     applyTranslation();
 
-    // Re-apply on dynamic changes with debounce
-    const observer = new MutationObserver(() => {
+    // Watch for DOM changes (React renders, data loads, etc.)
+    const observer = new MutationObserver((mutations) => {
       if (isTranslating) return;
+
+      // Only retranslate if there is actually Thai text in what changed
+      const hasThai = mutations.some((m) => {
+        if (m.type === 'characterData') {
+          return THAI_REGEX.test(m.target.nodeValue || '');
+        }
+        if (m.type === 'childList') {
+          return Array.from(m.addedNodes).some(
+            (n) => n.nodeType === Node.TEXT_NODE
+              ? THAI_REGEX.test(n.nodeValue || '')
+              : (n as Element).textContent
+                ? THAI_REGEX.test((n as Element).textContent || '')
+                : false
+          );
+        }
+        return false;
+      });
+
+      if (!hasThai && getLang() === 'th') return;
+
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         applyTranslation();
-      }, 40);
+      }, 50);
     });
 
     observer.observe(document.body, {
@@ -183,4 +243,3 @@ export function GlobalTranslator(): React.ReactNode {
   usePageTranslator();
   return null;
 }
-

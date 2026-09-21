@@ -60,7 +60,12 @@ export async function GET(request: Request) {
     }
     if (category) where.category = category;
     if (semester) where.semester = semester;
-    if (status) where.status = status;
+    // Treat APPROVED and PUBLISHED as equivalent for visibility — both mean the course is live
+    if (status === 'PUBLISHED') {
+      where.status = { in: ['PUBLISHED', 'APPROVED'] };
+    } else if (status) {
+      where.status = status;
+    }
 
     const [courses, total] = await Promise.all([
       prisma.course.findMany({

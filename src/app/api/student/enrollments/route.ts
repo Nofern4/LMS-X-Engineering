@@ -33,6 +33,11 @@ export async function GET(request: Request) {
                 },
               },
             },
+            materials: {
+              orderBy: { order: 'asc' },
+              take: 5,
+              select: { id: true, title: true, type: true, order: true },
+            },
             _count: {
               select: { materials: true, enrollments: true },
             },
