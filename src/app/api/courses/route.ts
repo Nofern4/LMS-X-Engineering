@@ -106,8 +106,16 @@ export async function GET(request: Request) {
       prisma.course.count({ where }),
     ]);
 
+    const serializedCourses = courses.map((c: any) => ({
+      ...c,
+      materials: (c.materials || []).map((m: any) => ({
+        ...m,
+        fileSize: m.fileSize ? m.fileSize.toString() : '0',
+      })),
+    }));
+
     const result = {
-      courses,
+      courses: serializedCourses,
       pagination: {
         page,
         limit,
