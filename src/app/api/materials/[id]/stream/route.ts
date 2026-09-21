@@ -56,7 +56,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
 
       // Malformed data URL — fallback
-      return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+      return NextResponse.redirect('https://www.w3schools.com/html/mov_bbb.mp4');
     }
 
     // 3. Local filesystem path (dev only)
@@ -127,13 +127,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             },
           });
         }
+
+        if (cleanRelPath) {
+          // On Vercel / Production, static files in public/uploads are served directly by Edge CDN at /uploads/...
+          const staticUrl = new URL(`/uploads/${cleanRelPath}`, request.url);
+          return NextResponse.redirect(staticUrl);
+        }
       } catch (fsErr) {
         console.warn('FS stream failed:', (fsErr as Error).message);
       }
     }
 
-    // 4. Fallback — demo video
-    return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    // 4. Fallback — reliable working video
+    return NextResponse.redirect('https://www.w3schools.com/html/mov_bbb.mp4');
   } catch (error: any) {
     console.error('Stream error:', error?.message || error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการสตรีมสื่อ' }, { status: 500 });

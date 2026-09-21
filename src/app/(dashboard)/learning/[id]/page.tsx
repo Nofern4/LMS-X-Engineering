@@ -580,6 +580,8 @@ export default function MaterialLearningPage({ params }: { params: Promise<{ id:
                   (activeMaterial.filePath.startsWith('http://') ||
                     activeMaterial.filePath.startsWith('https://'))
                     ? activeMaterial.filePath
+                    : activeMaterial?.filePath
+                    ? `/uploads/${activeMaterial.filePath.replace(/^\/?(uploads|public)\//, '')}`
                     : `/api/materials/${activeMaterial?.id}/stream`
                 }
                 title={activeMaterial?.title}

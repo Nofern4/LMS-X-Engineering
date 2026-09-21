@@ -24,7 +24,7 @@ function getGoogleDriveId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-const DEFAULT_PLAYABLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+const DEFAULT_PLAYABLE_VIDEO = 'https://www.w3schools.com/html/mov_bbb.mp4';
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   src,

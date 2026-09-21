@@ -80,7 +80,11 @@ export default function ProfessorClassesPage() {
                 durationText: m.duration ? `${Math.round(m.duration / 60)}:00 นาที` : '60:00 นาที',
                 fileSizeText: m.fileSize ? `${Math.round(Number(m.fileSize) / (1024 * 1024))} MB` : '150 MB',
                 uploadDate: new Date(m.createdAt || c.createdAt || Date.now()).toLocaleDateString('th-TH'),
-                videoUrl: m.filePath?.startsWith('http') ? m.filePath : `/api/materials/${m.id}/stream`,
+                videoUrl: m.filePath?.startsWith('http')
+                  ? m.filePath
+                  : m.filePath
+                  ? `/uploads/${m.filePath.replace(/^\/?(uploads|public)\//, '')}`
+                  : `/api/materials/${m.id}/stream`,
                 courseId: c.id,
               });
             });
@@ -95,7 +99,7 @@ export default function ProfessorClassesPage() {
               durationText: '60:00 นาที',
               fileSizeText: '180 MB',
               uploadDate: new Date(c.createdAt || Date.now()).toLocaleDateString('th-TH'),
-              videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+              videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
               courseId: c.id,
             });
           }
