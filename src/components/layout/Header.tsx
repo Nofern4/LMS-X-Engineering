@@ -76,19 +76,44 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
     return (nameStr || '').replace(/\s*\([A-Za-z0-9\s\.\-]+\)/g, '').trim();
   };
 
+  const cleanRolesList = (roles: string[]) => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const r of roles) {
+      const norm = r === 'APPROVER' ? 'COURSE_CREATOR_APPROVER' : r;
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        result.push(norm);
+      }
+    }
+    return result;
+  };
+
   const loadUserData = () => {
     try {
       const storedSession = localStorage.getItem('user_session');
       let email = localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th';
+      let currentRoles: string[] = [role];
+
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         if (parsed.email) email = parsed.email;
         if (parsed.name) setDisplayName(cleanName(parsed.name));
         if (parsed.roles && Array.isArray(parsed.roles)) {
-          setUserRoles(parsed.roles);
+          currentRoles = parsed.roles;
         }
       }
       setUserEmail(email);
+
+      // Merge any locally approved roles for this user
+      try {
+        const locallyApproved: string[] = JSON.parse(localStorage.getItem(`approved_roles_${email}`) || '[]');
+        locallyApproved.forEach((r) => {
+          if (!currentRoles.includes(r)) currentRoles.push(r);
+        });
+      } catch {}
+
+      setUserRoles(cleanRolesList(currentRoles));
 
       // Fetch fresh live user profile & roles from backend DB
       fetch(`/api/auth/login?email=${encodeURIComponent(email)}`)
@@ -96,12 +121,20 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
         .then((data) => {
           if (data.user) {
             setDisplayName(cleanName(data.user.name));
-            if (data.user.roles) {
-              setUserRoles(data.user.roles);
+            if (data.user.roles && Array.isArray(data.user.roles)) {
+              let fresh = [...data.user.roles];
+              try {
+                const locallyApproved: string[] = JSON.parse(localStorage.getItem(`approved_roles_${email}`) || '[]');
+                locallyApproved.forEach((r) => {
+                  if (!fresh.includes(r)) fresh.push(r);
+                });
+              } catch {}
+              const deduped = cleanRolesList(fresh);
+              setUserRoles(deduped);
               // Update session storage
               if (storedSession) {
                 const parsed = JSON.parse(storedSession);
-                parsed.roles = data.user.roles;
+                parsed.roles = deduped;
                 parsed.name = cleanName(data.user.name);
                 localStorage.setItem('user_session', JSON.stringify(parsed));
               }
@@ -117,11 +150,19 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
 
   useEffect(() => {
     loadUserData();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'role_last_updated' || e.key?.startsWith('approved_roles_') || e.key === 'user_session') {
+        loadUserData();
+      }
+    };
     window.addEventListener('profile_updated', loadUserData);
     window.addEventListener('role_updated', loadUserData);
+    window.addEventListener('storage', handleStorage);
+
     return () => {
       window.removeEventListener('profile_updated', loadUserData);
       window.removeEventListener('role_updated', loadUserData);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
@@ -421,6 +462,16 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, unreadNotificati
                           onClick={() => {
                             if (!isActive) {
                               setIsDropdownOpen(false);
+                              try {
+                                localStorage.setItem('active_role', r);
+                                const sess = localStorage.getItem('user_session');
+                                if (sess) {
+                                  const parsed = JSON.parse(sess);
+                                  parsed.activeRole = r;
+                                  localStorage.setItem('user_session', JSON.stringify(parsed));
+                                }
+                              } catch {}
+                              window.dispatchEvent(new CustomEvent('role_switched', { detail: { role: r } }));
                               router.push(getRoleHref(r));
                             }
                           }}

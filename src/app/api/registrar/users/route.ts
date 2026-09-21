@@ -34,27 +34,45 @@ export async function GET(request: Request) {
     }
 
     const limit = parseInt(searchParams.get('limit') || '100', 10);
-    const totalMatching = await prisma.user.count({ where });
-    const totalAllUsers = await prisma.user.count();
 
-    const users = await prisma.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit > 0 ? limit : 100,
-      include: {
-        userRoles: {
-          include: { role: true },
+    const [totalMatching, totalAllUsers, users, allRoles, roleCounts] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.count(),
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit > 0 ? limit : 100,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          studentId: true,
+          department: true,
+          status: true,
+          createdAt: true,
+          userRoles: {
+            select: {
+              role: {
+                select: { id: true, name: true, description: true },
+              },
+            },
+          },
         },
-      },
-    });
+      }),
+      prisma.role.findMany({ select: { id: true, name: true } }),
+      prisma.userRole.groupBy({
+        by: ['roleId'],
+        _count: { roleId: true },
+      }),
+    ]);
 
-    const allRoles = await prisma.role.findMany();
     const roleStats: Record<string, number> = {};
+    const countByRoleId: Record<string, number> = {};
+    for (const item of roleCounts) {
+      countByRoleId[item.roleId] = item._count.roleId;
+    }
     for (const r of allRoles) {
-      const count = await prisma.userRole.count({
-        where: { roleId: r.id },
-      });
-      roleStats[r.name] = count;
+      roleStats[r.name] = countByRoleId[r.id] || 0;
     }
 
     return NextResponse.json({ 

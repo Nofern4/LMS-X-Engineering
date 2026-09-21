@@ -25,6 +25,45 @@ export async function GET(request: Request) {
     }
 
     let roles = user.userRoles.map(ur => ur.role.name);
+
+    // Also include any approved role requests that might be in RoleRequest
+    try {
+      const approvedRequests = await prisma.roleRequest.findMany({
+        where: {
+          userId: user.id,
+          status: 'APPROVED',
+          requestType: 'GRANT',
+        },
+      });
+
+      for (const req of approvedRequests) {
+        let rName = req.roleName;
+        if (rName === 'APPROVER') rName = 'COURSE_CREATOR_APPROVER';
+        if (!roles.includes(rName)) {
+          roles.push(rName);
+          // Self-heal: ensure UserRole row exists in database
+          const dbRole = await prisma.role.findFirst({
+            where: {
+              OR: [
+                { name: rName },
+                { name: req.roleName },
+                ...(rName === 'COURSE_CREATOR_APPROVER' ? [{ name: 'APPROVER' }] : [])
+              ]
+            }
+          });
+          if (dbRole) {
+            await prisma.userRole.upsert({
+              where: { userId_roleId: { userId: user.id, roleId: dbRole.id } },
+              create: { userId: user.id, roleId: dbRole.id },
+              update: {},
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching approved requests in login route:', e);
+    }
+
     if (roles.length > 0 && !roles.includes('STUDENT')) {
       roles.push('STUDENT');
     }

@@ -7,15 +7,40 @@ import {
   BookOpen,
   ShieldCheck,
   UserCheck,
-  Users
+  Users,
+  RefreshCw,
+  History,
+  Clock,
+  Trash2,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+
+interface DecisionHistoryItem {
+  id: string;
+  type: 'COURSE' | 'ENROLLMENT';
+  title: string;
+  subtitle?: string;
+  action: 'APPROVE' | 'REJECT';
+  reason?: string;
+  timestamp: string;
+}
 
 export default function CourseApproverDashboard() {
   const [mounted, setMounted] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'courses' | 'enrollments'>('enrollments');
+  const [activeTab, setActiveTab] = useState<'courses' | 'enrollments' | 'history'>('enrollments');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Persistent record of approved / rejected decisions so they never pop back into pending list
+  const [decisionHistory, setDecisionHistory] = useState<DecisionHistoryItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('approver_decision_history') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [itemType, setItemType] = useState<'COURSE' | 'ENROLLMENT'>('ENROLLMENT');
@@ -23,18 +48,29 @@ export default function CourseApproverDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'APPROVE' | 'REJECT'>('APPROVE');
   const [isLoading, setIsLoading] = useState(false);
+  const [feedbackToast, setFeedbackToast] = useState<{ type: 'success' | 'danger'; text: string } | null>(null);
+  const isActionPendingRef = React.useRef(false);
 
   const fetchApprovals = async () => {
     if (isActionPendingRef.current) return;
     try {
+      setIsRefreshing(true);
       const [cRes, eRes] = await Promise.all([
-        fetch('/api/courses?t=' + Date.now(), { cache: 'no-store' }),
+        fetch('/api/courses?status=PENDING_APPROVAL&t=' + Date.now(), { cache: 'no-store' }),
         fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' }),
       ]);
       const [cData, eData] = await Promise.all([cRes.json(), eRes.json()]);
 
-      const pendingCourses = (cData.courses || []).filter((c: any) => c.status === 'PENDING_APPROVAL');
-      const pendingEnrollments = eData.enrollments || [];
+      // Read latest processed decisions from localStorage
+      let processedIds = new Set<string>();
+      try {
+        const savedHistory: DecisionHistoryItem[] = JSON.parse(localStorage.getItem('approver_decision_history') || '[]');
+        savedHistory.forEach((h) => processedIds.add(h.id));
+      } catch {}
+
+      // Filter out any items that have already been approved or rejected
+      const pendingCourses = (cData.courses || []).filter((c: any) => !processedIds.has(c.id) && c.status === 'PENDING_APPROVAL');
+      const pendingEnrollments = (eData.enrollments || []).filter((e: any) => !processedIds.has(e.id) && e.status === 'PENDING');
 
       if (!isActionPendingRef.current) {
         setCourses(pendingCourses);
@@ -42,6 +78,8 @@ export default function CourseApproverDashboard() {
       }
     } catch (err) {
       console.error('fetchApprovals error:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -50,12 +88,12 @@ export default function CourseApproverDashboard() {
     fetchApprovals();
     const handleUpdate = () => fetchApprovals();
     window.addEventListener('enrollment_updated', handleUpdate);
-    window.addEventListener('focus', handleUpdate);
-    const interval = setInterval(fetchApprovals, 2000);
+    window.addEventListener('course_updated', handleUpdate);
+    const interval = setInterval(fetchApprovals, 12000);
     return () => {
       clearInterval(interval);
       window.removeEventListener('enrollment_updated', handleUpdate);
-      window.removeEventListener('focus', handleUpdate);
+      window.removeEventListener('course_updated', handleUpdate);
     };
   }, []);
 
@@ -75,9 +113,6 @@ export default function CourseApproverDashboard() {
     setIsModalOpen(true);
   };
 
-  const isActionPendingRef = React.useRef(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
-
   const handleConfirmDecision = async () => {
     if (!selectedItem) return;
     const targetItem = selectedItem;
@@ -85,18 +120,54 @@ export default function CourseApproverDashboard() {
     const targetAction = actionType;
     const targetReason = rejectionReason;
 
-    // 1. Optimistic instant removal from UI
-    isActionPendingRef.current = true;
+    // 1. Immediately record in persistent history so it will NEVER reappear in pending queue
+    const title = targetType === 'COURSE'
+      ? (targetItem.title || targetItem.code)
+      : (targetItem.student?.name || 'นักศึกษา');
+    const subtitle = targetType === 'COURSE'
+      ? `รหัสวิชา: ${targetItem.code}`
+      : `${targetItem.course?.code} - ${targetItem.course?.title}`;
+
+    const newRecord: DecisionHistoryItem = {
+      id: targetItem.id,
+      type: targetType,
+      title,
+      subtitle,
+      action: targetAction,
+      reason: targetReason || undefined,
+      timestamp: new Date().toLocaleString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    const nextHistory = [newRecord, ...decisionHistory.filter((h) => h.id !== targetItem.id)];
+    setDecisionHistory(nextHistory);
+    try {
+      localStorage.setItem('approver_decision_history', JSON.stringify(nextHistory));
+    } catch {}
+
+    // 2. Permanently remove from local view state immediately
     if (targetType === 'COURSE') {
       setCourses((prev) => prev.filter((c) => c.id !== targetItem.id));
-      setSuccessToast(targetAction === 'APPROVE' ? `อนุมัติเปิดรายวิชา ${targetItem.title || targetItem.code} สำเร็จแล้ว` : `ปฏิเสธคำขอเปิดรายวิชาเรียบร้อยแล้ว`);
     } else {
       setEnrollments((prev) => prev.filter((e) => e.id !== targetItem.id));
-      setSuccessToast(targetAction === 'APPROVE' ? `อนุมัตินักศึกษา ${targetItem.student?.name || 'นักศึกษา'} เข้าเรียนสำเร็จแล้ว` : `ปฏิเสธคำขอเข้าเรียนเรียบร้อยแล้ว`);
     }
-    setIsModalOpen(false);
-    setTimeout(() => setSuccessToast(null), 4000);
 
+    // 3. Show clear, prominent feedback toast according to action clicked
+    setFeedbackToast({
+      type: targetAction === 'APPROVE' ? 'success' : 'danger',
+      text: targetAction === 'APPROVE'
+        ? `✅ อนุมัติ "${title}" สำเร็จแล้ว ข้อมูลถูกบันทึกลงระบบเรียบร้อย`
+        : `❌ ไม่อนุมัติ "${title}" เรียบร้อยแล้ว`,
+    });
+    setIsModalOpen(false);
+    setTimeout(() => setFeedbackToast(null), 5000);
+
+    // 4. Send API request to persist on server
     let userPayload: any = { id: 'approver-1', roles: ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'APPROVER', 'ADMIN'] };
     try {
       const sess = localStorage.getItem('user_session');
@@ -126,6 +197,7 @@ export default function CourseApproverDashboard() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            enrollmentId: targetItem.id,
             courseId: targetItem.courseId || targetItem.course?.id,
             studentId: targetItem.studentId || targetItem.student?.id,
             action: targetAction,
@@ -143,21 +215,41 @@ export default function CourseApproverDashboard() {
       }
     } catch (e) {
       console.error('Decision error:', e);
-    } finally {
-      setTimeout(() => {
-        isActionPendingRef.current = false;
-        fetchApprovals();
-      }, 1200);
+    }
+  };
+
+  const handleClearHistory = () => {
+    if (confirm('คุณต้องการล้างประวัติการพิจารณาออกจากหน้านี้หรือไม่? (ข้อมูลที่อนุมัติแล้วในระบบจะไม่เปลี่ยนแปลง)')) {
+      setDecisionHistory([]);
+      try {
+        localStorage.removeItem('approver_decision_history');
+      } catch {}
     }
   };
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-16 font-sans text-slate-900">
       {/* Toast Notice */}
-      {successToast && (
-        <div className="p-4 rounded-2xl bg-[#CEF34B] text-black font-black text-sm flex items-center gap-3 shadow-xl animate-fadeIn border-2 border-black">
-          <CheckCircle className="w-5 h-5 text-black flex-shrink-0" />
-          <span>{successToast}</span>
+      {feedbackToast && (
+        <div className={`p-4 rounded-2xl font-black text-sm flex items-center justify-between shadow-xl animate-fadeIn border-2 ${
+          feedbackToast.type === 'success'
+            ? 'bg-[#CEF34B] text-black border-black'
+            : 'bg-rose-500 text-white border-rose-700'
+        }`}>
+          <div className="flex items-center gap-3">
+            {feedbackToast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-black flex-shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 text-white flex-shrink-0" />
+            )}
+            <span>{feedbackToast.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedbackToast(null)}
+            className="p-1 hover:opacity-70 cursor-pointer font-bold ml-4"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -191,7 +283,7 @@ export default function CourseApproverDashboard() {
       </div>
 
       {/* Overview Metric Cards for Approver (Clickable to switch tab) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl">
         {/* Card 1: Course Approvals */}
         <div
           onClick={() => setActiveTab('courses')}
@@ -257,6 +349,39 @@ export default function CourseApproverDashboard() {
             คำขอเข้าเรียนของนักศึกษาที่รอการอนุมัติ
           </p>
         </div>
+
+        {/* Card 3: Decision History */}
+        <div
+          onClick={() => setActiveTab('history')}
+          className={`p-6 rounded-3xl transition-all cursor-pointer ${
+            activeTab === 'history'
+              ? 'bg-black text-white border-2 border-[#CEF34B] shadow-xl scale-[1.02]'
+              : 'bg-white text-slate-900 border border-slate-200 shadow-xs hover:border-slate-400'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold ${
+              activeTab === 'history'
+                ? 'bg-[#CEF34B] text-black border border-[#CEF34B]'
+                : 'bg-slate-100 text-slate-800'
+            }`}>
+              <History className="w-6 h-6" />
+            </div>
+            <span className={`px-3.5 py-1 rounded-full font-extrabold text-xs shadow-xs ${
+              activeTab === 'history'
+                ? 'bg-[#CEF34B] text-black'
+                : 'bg-slate-100 text-slate-700'
+            }`}>
+              {decisionHistory.length} รายการ
+            </span>
+          </div>
+          <h3 className={`text-base font-extrabold mt-4 ${activeTab === 'history' ? 'text-white' : 'text-slate-900'}`}>
+            ประวัติการพิจารณา
+          </h3>
+          <p className={`text-xs mt-1 ${activeTab === 'history' ? 'text-slate-300' : 'text-slate-500'}`}>
+            รายการที่พิจารณาอนุมัติ/ไม่อนุมัติแล้ว
+          </p>
+        </div>
       </div>
 
       {/* Main Approval Action Container */}
@@ -305,6 +430,39 @@ export default function CourseApproverDashboard() {
               >
                 {enrollments.length} คน
               </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-black text-white shadow-sm'
+                  : 'text-slate-700 hover:text-black'
+              }`}
+            >
+              <History className="w-4 h-4 text-[#CEF34B]" />
+              <span>ประวัติการพิจารณา</span>
+              <span
+                key={`history-badge-${decisionHistory.length}`}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  activeTab === 'history'
+                    ? 'bg-[#CEF34B] text-black shadow-xs'
+                    : 'bg-slate-200 text-slate-800'
+                }`}
+              >
+                {decisionHistory.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchApprovals()}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:border-black rounded-xl text-xs font-bold text-slate-700 hover:text-black transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              title="ดึงข้อมูลคำขอล่าสุดจากเซิร์ฟเวอร์"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-black' : 'text-slate-500'}`} />
+              <span>{isRefreshing ? 'กำลังโหลด...' : 'รีเฟรชข้อมูล'}</span>
             </button>
           </div>
         </div>
@@ -439,6 +597,99 @@ export default function CourseApproverDashboard() {
                           <XCircle className="w-3.5 h-3.5 text-rose-600" />
                           <span>ไม่อนุมัติ</span>
                         </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 3: Decision History Table */}
+        {activeTab === 'history' && (
+          <div className="overflow-x-auto animate-fadeIn">
+            <div className="p-4 px-6 flex flex-wrap items-center justify-between gap-3 bg-slate-50 border-b border-slate-200">
+              <div>
+                <h4 className="text-xs font-black text-slate-800">
+                  ประวัติการดำเนินการพิจารณา ({decisionHistory.length} รายการ)
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  รายการที่กดอนุมัติหรือไม่อนุมัติแล้วจะไม่ปรากฏในรายการรอด้านบนอีกต่อไป
+                </p>
+              </div>
+              {decisionHistory.length > 0 && (
+                <button
+                  onClick={handleClearHistory}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-xl transition-colors font-bold cursor-pointer border border-rose-200"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>ล้างประวัติ</span>
+                </button>
+              )}
+            </div>
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100/70 text-slate-600 border-b border-slate-200 font-bold uppercase tracking-wider">
+                  <th className="p-4 pl-6">รายการ / ผู้ขอ</th>
+                  <th className="p-4">ประเภทคำขอ</th>
+                  <th className="p-4">ผลการพิจารณา</th>
+                  <th className="p-4">วันที่ - เวลา</th>
+                  <th className="p-4 pr-6">เหตุผล / หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {decisionHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center text-slate-500 font-medium">
+                      ยังไม่มีประวัติการพิจารณาในรอบนี้ (เมื่อกดอนุมัติหรือไม่อนุมัติ รายการจะถูกบันทึกไว้ที่นี่ทันที)
+                    </td>
+                  </tr>
+                ) : (
+                  decisionHistory.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 pl-6">
+                        <div className="font-bold text-slate-900">{item.title}</div>
+                        {item.subtitle && (
+                          <div className="text-[11px] text-slate-500 font-medium">{item.subtitle}</div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                          item.type === 'COURSE'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200'
+                        }`}>
+                          {item.type === 'COURSE' ? 'เปิดรายวิชาใหม่' : 'เข้าเรียนของนักศึกษา'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {item.action === 'APPROVE' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#CEF34B] text-black border border-black/20 font-black text-[11px] shadow-xs">
+                            <CheckCircle className="w-3.5 h-3.5 text-black" />
+                            <span>อนุมัติแล้ว</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-black text-[11px] shadow-xs">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>ไม่อนุมัติ</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-slate-600 font-mono text-[11px]">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{item.timestamp}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 pr-6 text-slate-600 text-[11px]">
+                        {item.reason ? (
+                          <span className="text-rose-600 font-medium italic bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">
+                            "{item.reason}"
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
                     </tr>
                   ))

@@ -59,7 +59,7 @@ export default function GlobalCoursesCatalogPage() {
   };
 
   const fetchCoursesList = () => {
-    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}&t=${Date.now()}`, { cache: 'no-store' })
+    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}`)
       .then((r) => r.json())
       .then((d) => {
         const list: any[] = d.courses || [];
@@ -90,11 +90,9 @@ export default function GlobalCoursesCatalogPage() {
     fetchCoursesList();
     window.addEventListener('course_updated', fetchCoursesList);
     window.addEventListener('enrollment_updated', fetchCoursesList);
-    window.addEventListener('focus', fetchCoursesList);
     return () => {
       window.removeEventListener('course_updated', fetchCoursesList);
       window.removeEventListener('enrollment_updated', fetchCoursesList);
-      window.removeEventListener('focus', fetchCoursesList);
     };
   }, [search, searchType, semester]);
 

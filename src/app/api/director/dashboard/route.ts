@@ -44,11 +44,11 @@ export async function GET() {
         orderBy: { createdAt: 'desc' },
         select: { id: true, title: true, level: true, publishedAt: true },
       }),
-      prisma.learningMaterial.findMany({ select: { fileSize: true } })
+      prisma.learningMaterial.aggregate({ _sum: { fileSize: true } })
     ]);
 
     // Calculate total storage in GB
-    const totalStorageBytes = materials.reduce((acc, m) => acc + Number(m.fileSize), 0);
+    const totalStorageBytes = Number(materials._sum.fileSize || 0);
     const storageUsedGb = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
 
     // Dynamic materials per course for charts

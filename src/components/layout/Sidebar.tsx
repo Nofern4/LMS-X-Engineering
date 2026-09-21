@@ -49,8 +49,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
   }, [email]);
 
   useEffect(() => {
+    const isApprover = role === 'COURSE_CREATOR_APPROVER' || role === 'CONTENT_APPROVER' || role === 'APPROVER';
+    if (!isApprover) return;
+
     const fetchPending = () => {
-      fetch('/api/courses/enrollments?status=PENDING&t=' + Date.now(), { cache: 'no-store' })
+      fetch('/api/courses/enrollments?status=PENDING')
         .then((r) => r.json())
         .then((d) => {
           setPendingApprovalsCount(d.enrollments?.length || 0);
@@ -58,15 +61,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, userName, email }) => {
         .catch(() => {});
     };
     fetchPending();
-    const interval = setInterval(fetchPending, 3000);
+    const interval = setInterval(fetchPending, 15000);
     window.addEventListener('enrollment_updated', fetchPending);
-    window.addEventListener('focus', fetchPending);
     return () => {
       clearInterval(interval);
       window.removeEventListener('enrollment_updated', fetchPending);
-      window.removeEventListener('focus', fetchPending);
     };
-  }, []);
+  }, [role]);
   const isDirector = role === 'DIRECTOR';
 
   const handleLogout = () => {

@@ -10,27 +10,59 @@ import { usePageTranslator } from '@/lib/i18n/usePageTranslator';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   usePageTranslator();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const sess = localStorage.getItem('user_session');
+      if (sess) return JSON.parse(sess);
+    } catch {}
+    return null;
+  });
 
   const fetchCurrentUserData = () => {
     // Read email from session/demo switcher
-    const demoEmail = localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th';
+    let demoEmail = 'student@student.x-karchang.ac.th';
+    try {
+      const sess = localStorage.getItem('user_session');
+      if (sess) {
+        const p = JSON.parse(sess);
+        if (p.email) demoEmail = p.email;
+      } else {
+        demoEmail = localStorage.getItem('demo_user_email') || 'student@student.x-karchang.ac.th';
+      }
+    } catch {}
+
+    const locallyApproved: string[] = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(`approved_roles_${demoEmail}`) || '[]');
+      } catch {
+        return [];
+      }
+    })();
 
     // Fetch live user info via auth API
     fetch(`/api/auth/login?email=${encodeURIComponent(demoEmail)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.user) {
+          const userRoles = Array.isArray(data.user.roles) ? [...data.user.roles] : ['STUDENT'];
+          locallyApproved.forEach((r) => {
+            if (!userRoles.includes(r)) userRoles.push(r);
+          });
+          data.user.roles = userRoles;
           setCurrentUser(data.user);
         } else {
           // Fallback mock session for local dev
           const getRolesForEmail = (e: string) => {
-            if (e.includes('registrar')) return ['REGISTRAR', 'STUDENT'];
-            if (e.includes('director')) return ['DIRECTOR', 'STUDENT'];
-            if (e.includes('prof')) return ['PROFESSOR', 'STUDENT'];
-            if (e.includes('approver')) return ['COURSE_CREATOR_APPROVER', 'STUDENT'];
-            return ['STUDENT'];
+            const baseRoles = e.includes('registrar') ? ['REGISTRAR', 'STUDENT']
+              : e.includes('director') ? ['DIRECTOR', 'STUDENT']
+              : e.includes('prof') ? ['PROFESSOR', 'STUDENT']
+              : e.includes('approver') ? ['COURSE_CREATOR_APPROVER', 'STUDENT']
+              : ['STUDENT'];
+            locallyApproved.forEach((r) => {
+              if (!baseRoles.includes(r)) baseRoles.push(r);
+            });
+            return baseRoles;
           };
 
           setCurrentUser({
@@ -50,20 +82,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
       })
       .catch(() => {
+        const fallbackRoles = ['STUDENT'];
+        locallyApproved.forEach((r) => {
+          if (!fallbackRoles.includes(r)) fallbackRoles.push(r);
+        });
         setCurrentUser({
           id: 'demo-user-1',
           name: 'สมชาย ช่างกล',
           email: demoEmail,
-          roles: ['STUDENT'],
+          roles: fallbackRoles,
         });
-      })
-      .finally(() => setIsLoading(false));
+      });
   };
 
   useEffect(() => {
     fetchCurrentUserData();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'role_last_updated' || e.key?.startsWith('approved_roles_') || e.key === 'user_session') {
+        fetchCurrentUserData();
+      }
+    };
     window.addEventListener('role_updated', fetchCurrentUserData);
-    return () => window.removeEventListener('role_updated', fetchCurrentUserData);
+    window.addEventListener('role_switched', fetchCurrentUserData);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('role_updated', fetchCurrentUserData);
+      window.removeEventListener('role_switched', fetchCurrentUserData);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   let role: RoleName = currentUser?.roles?.[0] || 'STUDENT';

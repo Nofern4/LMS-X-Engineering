@@ -113,12 +113,25 @@ function RegistrarUsersContent() {
       .finally(() => setIsLoading(false));
   };
 
+  const deduplicateRequests = (requests: any[]) => {
+    const seen = new Set<string>();
+    return (requests || []).filter((req: any) => {
+      const uId = req.userId || req.user?.id || req.user?.email || 'unknown';
+      let rName = req.roleName;
+      if (rName === 'APPROVER') rName = 'COURSE_CREATOR_APPROVER';
+      const key = `${uId}_${rName}_${req.requestType || 'GRANT'}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const fetchRoleRequests = () => {
     setIsLoadingRequests(true);
     fetch('/api/roles/request?all=true')
       .then((r) => r.json())
       .then((d) => {
-        setRoleRequests(d.requests || []);
+        setRoleRequests(deduplicateRequests(d.requests || []));
       })
       .catch((err) => console.error(err))
       .finally(() => setIsLoadingRequests(false));
@@ -146,6 +159,9 @@ function RegistrarUsersContent() {
         body: JSON.stringify({
           requestId: reqId,
           action: 'APPROVE',
+          userId: targetReq?.userId || targetReq?.user?.id,
+          userEmail: targetReq?.user?.email,
+          roleName: targetReq?.roleName,
           reviewerEmail: 'registrar@x-karchang.ac.th',
           reviewNote: 'นายทะเบียนตรวจสอบคุณสมบัติและอนุมัติสิทธิ์เรียบร้อยแล้ว',
         }),
@@ -153,18 +169,55 @@ function RegistrarUsersContent() {
       const data = await res.json();
       if (!res.ok) {
         // Rollback on failure
-        if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
+        if (targetReq) setRoleRequests((prev) => deduplicateRequests([targetReq, ...prev]));
         setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการอนุมัติ' });
       } else {
         setRequestFeedback({
           type: 'success',
           text: `อนุมัติสิทธิ์ ${targetReq?.roleName === 'COURSE_CREATOR_APPROVER' ? 'คนอนุมัติ (APPROVER)' : targetReq?.roleName || ''} เรียบร้อยแล้ว ระบบปรับปรุงข้อมูลผู้ใช้ทันที`,
         });
+
+        // Instant local sync for immediate UI role reflect without refresh
+        if (targetReq?.user?.email && targetReq?.roleName) {
+          const approvedEmail = targetReq.user.email;
+          let roleToAdd = targetReq.roleName;
+          if (roleToAdd === 'APPROVER') roleToAdd = 'COURSE_CREATOR_APPROVER';
+
+          const storageKey = `approved_roles_${approvedEmail}`;
+          try {
+            const existing: string[] = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            if (!existing.includes(roleToAdd)) {
+              existing.push(roleToAdd);
+              localStorage.setItem(storageKey, JSON.stringify(existing));
+            }
+          } catch {}
+
+          try {
+            const sessStr = localStorage.getItem('user_session');
+            if (sessStr) {
+              const sess = JSON.parse(sessStr);
+              if (sess.email === approvedEmail) {
+                const rList = Array.isArray(sess.roles) ? sess.roles : [];
+                if (!rList.includes(roleToAdd)) {
+                  rList.push(roleToAdd);
+                  sess.roles = rList;
+                  localStorage.setItem('user_session', JSON.stringify(sess));
+                }
+              }
+            }
+          } catch {}
+
+          localStorage.setItem('role_last_updated', Date.now().toString());
+          window.dispatchEvent(new CustomEvent('role_updated', {
+            detail: { email: approvedEmail, role: roleToAdd }
+          }));
+        }
+
         fetchUsers();
-        window.dispatchEvent(new Event('role_updated'));
+        fetchRoleRequests();
       }
     } catch (e) {
-      if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
+      if (targetReq) setRoleRequests((prev) => deduplicateRequests([targetReq, ...prev]));
       setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
     } finally {
       setRequestActionLoading(null);
@@ -185,19 +238,22 @@ function RegistrarUsersContent() {
         body: JSON.stringify({
           requestId: reqId,
           action: 'REJECT',
+          userId: targetReq?.userId || targetReq?.user?.id,
+          userEmail: targetReq?.user?.email,
+          roleName: targetReq?.roleName,
           reviewerEmail: 'registrar@x-karchang.ac.th',
           reviewNote: 'นายทะเบียนปฏิเสธคำขอ เนื่องจากไม่ผ่านเกณฑ์การประเมินสิทธิ์',
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
+        if (targetReq) setRoleRequests((prev) => deduplicateRequests([targetReq, ...prev]));
         setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการปฏิเสธ' });
       } else {
         fetchRoleRequests();
       }
     } catch (e) {
-      if (targetReq) setRoleRequests((prev) => [targetReq, ...prev]);
+      if (targetReq) setRoleRequests((prev) => deduplicateRequests([targetReq, ...prev]));
       setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
     } finally {
       setRequestActionLoading(null);

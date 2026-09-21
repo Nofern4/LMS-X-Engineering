@@ -64,10 +64,12 @@ export const DemoRoleSwitcher: React.FC = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem('demo_user_email');
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/course-approver')) {
+    const hasSession = !!localStorage.getItem('user_session');
+
+    if (!hasSession && !saved && typeof window !== 'undefined' && window.location.pathname.startsWith('/course-approver')) {
       setCurrentEmail('course.approver@x-karchang.ac.th');
       localStorage.setItem('demo_user_email', 'course.approver@x-karchang.ac.th');
-    } else if (typeof window !== 'undefined' && window.location.pathname.startsWith('/director')) {
+    } else if (!hasSession && !saved && typeof window !== 'undefined' && window.location.pathname.startsWith('/director')) {
       setCurrentEmail('director@x-karchang.ac.th');
       localStorage.setItem('demo_user_email', 'director@x-karchang.ac.th');
     } else if (saved) {

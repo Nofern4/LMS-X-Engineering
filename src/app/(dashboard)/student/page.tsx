@@ -112,12 +112,10 @@ export default function StudentDashboard() {
     window.addEventListener('role_updated', loadData);
     window.addEventListener('enrollment_updated', loadData);
     window.addEventListener('course_updated', loadData);
-    window.addEventListener('focus', loadData);
     return () => {
       window.removeEventListener('role_updated', loadData);
       window.removeEventListener('enrollment_updated', loadData);
       window.removeEventListener('course_updated', loadData);
-      window.removeEventListener('focus', loadData);
     };
   }, []);
 

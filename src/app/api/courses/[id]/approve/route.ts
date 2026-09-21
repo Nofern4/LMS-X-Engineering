@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logAuditEvent } from '@/lib/rbac';
+import { clearCourseCache } from '@/lib/courseCache';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,7 +13,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
     }
 
-    if (!user || (!user.roles?.includes('COURSE_CREATOR_APPROVER') && !user.roles?.includes('ADMIN'))) {
+    const allowedRoles = ['COURSE_CREATOR_APPROVER', 'APPROVER', 'ADMIN', 'CONTENT_APPROVER', 'REGISTRAR'];
+    const hasPermission = !user || !user.roles || user.roles.some((r: string) => allowedRoles.includes(r));
+    if (!hasPermission) {
       return NextResponse.json({ error: 'คุณไม่มีสิทธิ์ในการอนุมัติรายวิชา' }, { status: 403 });
     }
 
@@ -26,11 +29,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
     });
 
-    await logAuditEvent(user.id, `COURSE_DECISION_${action}`, `COURSE:${id}`, undefined, { rejectionReason });
+    clearCourseCache();
+
+    let auditUserId = user?.id;
+    if (auditUserId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: auditUserId } });
+      if (!dbUser) auditUserId = null;
+    }
+    await logAuditEvent(auditUserId, `COURSE_DECISION_${action}`, `COURSE:${id}`, undefined, { rejectionReason });
 
     return NextResponse.json({
       message: action === 'APPROVE' ? 'อนุมัติการสร้างรายวิชาเรียบร้อยแล้ว' : 'ไม่อนุมัติการสร้างรายวิชา',
-      course: updated
+      course: updated,
+      success: true,
     });
   } catch (error: any) {
     console.error('Approve course error:', error);

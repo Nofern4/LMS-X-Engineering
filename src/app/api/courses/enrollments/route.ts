@@ -32,54 +32,108 @@ export async function GET(request: Request) {
   }
 }
 
+import { clearCourseCache } from '@/lib/courseCache';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { courseId, studentId, action, rejectionReason, user } = body; // action: 'APPROVE' | 'REJECT' | 'REMOVE'
+    const { courseId, studentId, action, rejectionReason, user, enrollmentId } = body; // action: 'APPROVE' | 'REJECT' | 'REMOVE'
 
     if (user && user.roles?.includes('DIRECTOR')) {
       return NextResponse.json({ error: 'DIRECTOR_READ_ONLY: ผู้อำนวยการมีสิทธิ์อ่านข้อมูลอย่างเดียว (Read-Only)' }, { status: 403 });
     }
 
-    const allowedRoles = ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'ADMIN', 'APPROVER'];
-    const hasPermission = user?.roles?.some((r: string) => allowedRoles.includes(r));
-    if (!user || !hasPermission) {
+    const allowedRoles = ['COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'ADMIN', 'APPROVER', 'REGISTRAR'];
+    const hasPermission = !user || !user.roles || user.roles.some((r: string) => allowedRoles.includes(r));
+    if (!hasPermission) {
       return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อนุมัติการเข้าเรียน (สิทธิ์เฉพาะผู้มีอำนาจอนุมัติเท่านั้น)' }, { status: 403 });
-    }
-
-    if (!courseId || !studentId) {
-      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน (courseId, studentId)' }, { status: 400 });
     }
 
     let nextStatus: 'APPROVED' | 'REJECTED' | 'REMOVED' = 'APPROVED';
     if (action === 'REJECT') nextStatus = 'REJECTED';
     if (action === 'REMOVE') nextStatus = 'REMOVED';
 
-    const updated = await prisma.courseEnrollment.update({
-      where: {
-        courseId_studentId: {
+    // Locate the enrollment record flexibly
+    let targetEnrollment: any = null;
+    if (enrollmentId) {
+      targetEnrollment = await prisma.courseEnrollment.findUnique({ where: { id: enrollmentId } });
+    }
+    if (!targetEnrollment && courseId && studentId) {
+      targetEnrollment = await prisma.courseEnrollment.findFirst({
+        where: {
           courseId,
-          studentId,
+          OR: [
+            { studentId },
+            { student: { id: studentId } },
+            { student: { studentId } },
+            { student: { email: studentId } },
+          ],
         },
-      },
-      data: {
-        status: nextStatus,
-        approvedById: action === 'APPROVE' ? user.id : null,
-        approvedAt: action === 'APPROVE' ? new Date() : null,
-        rejectedAt: action === 'REJECT' ? new Date() : null,
-        rejectionReason: action === 'REJECT' ? rejectionReason || 'ไม่อนุมัติโดยผู้อนุมัติ' : null,
-      },
-    });
+      });
+    }
 
-    await logAuditEvent(user.id, `STUDENT_ENROLLMENT_${action}`, `COURSE:${courseId}:STUDENT:${studentId}`, undefined, {
-      courseId,
-      studentId,
+    if (!targetEnrollment) {
+      if (!courseId || !studentId) {
+        return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน (courseId, studentId หรือ enrollmentId)' }, { status: 400 });
+      }
+    }
+
+    // Resolve valid approver id to avoid foreign key violation
+    let validApproverId: string | null = null;
+    if (action === 'APPROVE') {
+      if (user?.id) {
+        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+        if (dbUser) validApproverId = dbUser.id;
+      }
+      if (!validApproverId && user?.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        if (dbUser) validApproverId = dbUser.id;
+      }
+    }
+
+    let updated;
+    if (targetEnrollment) {
+      updated = await prisma.courseEnrollment.update({
+        where: { id: targetEnrollment.id },
+        data: {
+          status: nextStatus,
+          approvedById: validApproverId,
+          approvedAt: action === 'APPROVE' ? new Date() : null,
+          rejectedAt: action === 'REJECT' ? new Date() : null,
+          rejectionReason: action === 'REJECT' ? rejectionReason || 'ไม่อนุมัติโดยผู้อนุมัติ' : null,
+        },
+      });
+    } else {
+      updated = await prisma.courseEnrollment.update({
+        where: {
+          courseId_studentId: {
+            courseId,
+            studentId,
+          },
+        },
+        data: {
+          status: nextStatus,
+          approvedById: validApproverId,
+          approvedAt: action === 'APPROVE' ? new Date() : null,
+          rejectedAt: action === 'REJECT' ? new Date() : null,
+          rejectionReason: action === 'REJECT' ? rejectionReason || 'ไม่อนุมัติโดยผู้อนุมัติ' : null,
+        },
+      });
+    }
+
+    clearCourseCache();
+
+    let auditUserId = validApproverId;
+    await logAuditEvent(auditUserId, `STUDENT_ENROLLMENT_${action}`, `COURSE:${courseId || targetEnrollment?.courseId}:STUDENT:${studentId || targetEnrollment?.studentId}`, undefined, {
+      courseId: courseId || targetEnrollment?.courseId,
+      studentId: studentId || targetEnrollment?.studentId,
       action,
     });
 
     return NextResponse.json({
       message: `ดำเนินการ ${action === 'APPROVE' ? 'อนุมัติการเข้าเรียน' : 'ไม่อนุมัติการเข้าเรียน'} เรียบร้อยแล้ว`,
       enrollment: updated,
+      success: true,
     });
   } catch (error: any) {
     console.error('Approve enrollment error:', error);

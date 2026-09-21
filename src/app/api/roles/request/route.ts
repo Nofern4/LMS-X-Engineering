@@ -53,7 +53,18 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ requests });
+    // Deduplicate requests taking only the newest request per user + role + requestType
+    const seen = new Set<string>();
+    const deduplicatedRequests = requests.filter((req) => {
+      const uId = req.userId || req.user?.id || req.user?.email || 'unknown';
+      const rName = req.roleName === 'APPROVER' ? 'COURSE_CREATOR_APPROVER' : req.roleName;
+      const key = `${uId}_${rName}_${req.requestType || 'GRANT'}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return NextResponse.json({ requests: deduplicatedRequests });
   } catch (error: any) {
     console.error('Fetch role requests error:', error);
     return NextResponse.json({ error: 'ไม่สามารถดึงข้อมูลคำขอสิทธิ์ได้' }, { status: 500 });
@@ -92,7 +103,7 @@ export async function POST(request: Request) {
 
     // Case 1: Instant Revoke / Relinquish
     if (instantRevoke || requestType === 'REVOKE') {
-      if (!currentRoleNames.includes(roleName)) {
+      if (!currentRoleNames.includes(roleName) && !(roleName === 'APPROVER' && currentRoleNames.includes('COURSE_CREATOR_APPROVER'))) {
         return NextResponse.json({ error: `ผู้ใช้งานไม่ได้ถือครองบทบาท ${roleName} อยู่ในปัจจุบัน` }, { status: 400 });
       }
 
@@ -163,56 +174,65 @@ export async function POST(request: Request) {
     }
 
     // Case 2: Request New Role (GRANT)
-    if (currentRoleNames.includes(roleName)) {
+    if (currentRoleNames.includes(roleName) || (roleName === 'APPROVER' && currentRoleNames.includes('COURSE_CREATOR_APPROVER'))) {
       return NextResponse.json({ error: `คุณมีบทบาท ${roleName} อยู่แล้ว ไม่จำเป็นต้องขอเพิ่ม` }, { status: 400 });
     }
 
-    // Check pending requests
+    // Check pending requests - if already pending, update reason and bump timestamp to latest
     const pendingReq = await prisma.roleRequest.findFirst({
       where: {
         userId: user.id,
-        roleName,
+        roleName: { in: [roleName, roleName === 'APPROVER' ? 'COURSE_CREATOR_APPROVER' : 'APPROVER'] },
         status: 'PENDING',
         requestType: 'GRANT',
       },
     });
 
+    let newRequest;
     if (pendingReq) {
-      return NextResponse.json({
-        error: `คุณมีคำขอรับสิทธิ์บทบาท ${roleName} ที่อยู่ระหว่างรอนายทะเบียนพิจารณาอยู่แล้ว`,
-      }, { status: 400 });
-    }
-
-    // Create new role request
-    const newRequest = await prisma.roleRequest.create({
-      data: {
-        userId: user.id,
-        roleName,
-        requestType: 'GRANT',
-        status: 'PENDING',
-        reason: reason || 'ยื่นคำขอรับสิทธิ์ผ่านแถบ Header',
-      },
-    });
-
-    // Notify Registrar users
-    const registrars = await prisma.user.findMany({
-      where: {
-        userRoles: {
-          some: { role: { name: 'REGISTRAR' } },
-        },
-      },
-    });
-
-    for (const reg of registrars) {
-      await prisma.notification.create({
+      newRequest = await prisma.roleRequest.update({
+        where: { id: pendingReq.id },
         data: {
-          userId: reg.id,
-          title: `คำขอรับสิทธิ์บทบาทใหม่: ${roleName}`,
-          message: `${user.name} (${user.email}) ได้ส่งคำขอรับสิทธิ์บทบาท ${roleName} เหตุผล: ${reason || '-'}`,
-          type: 'INFO',
-          link: '/registrar/users',
+          reason: reason || pendingReq.reason || 'ยื่นคำขอรับสิทธิ์ผ่านแถบ Header',
+          createdAt: new Date(),
         },
       });
+    } else {
+      // Create new role request
+      newRequest = await prisma.roleRequest.create({
+        data: {
+          userId: user.id,
+          roleName,
+          requestType: 'GRANT',
+          status: 'PENDING',
+          reason: reason || 'ยื่นคำขอรับสิทธิ์ผ่านแถบ Header',
+        },
+      });
+    }
+
+    // Notify Registrar users
+    try {
+      const registrars = await prisma.user.findMany({
+        where: {
+          userRoles: {
+            some: { role: { name: 'REGISTRAR' } },
+          },
+        },
+      });
+
+      for (const reg of registrars) {
+        await prisma.notification.create({
+          data: {
+            userId: reg.id,
+            title: `คำขอรับสิทธิ์บทบาทใหม่: ${roleName}`,
+            message: `${user.name} (${user.email}) ได้ส่งคำขอรับสิทธิ์บทบาท ${roleName} เหตุผล: ${reason || '-'}`,
+            type: 'INFO',
+            link: '/registrar/users',
+          },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Could not notify registrars:', notifErr);
     }
 
     await logAuditEvent(
@@ -237,20 +257,62 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { requestId, action, reviewerEmail, reviewNote } = body;
+    const { requestId, action, reviewerEmail, reviewNote, userId, userEmail, roleName: bodyRoleName } = body;
 
-    if (!requestId || !action) {
-      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน (ต้องการ requestId และ action)' }, { status: 400 });
+    if (!action) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน (ต้องการ action)' }, { status: 400 });
     }
 
-    const roleReq = await prisma.roleRequest.findUnique({
-      where: { id: requestId },
-      include: { user: true },
-    });
-
-    if (!roleReq) {
-      return NextResponse.json({ error: 'ไม่พบคำขอสิทธิ์ที่ระบุ' }, { status: 404 });
+    let roleReq = null;
+    if (requestId) {
+      roleReq = await prisma.roleRequest.findUnique({
+        where: { id: requestId },
+        include: { user: true },
+      });
     }
+
+    // Fallback: If not found by ID (e.g. multi-container serverless or regenerated IDs), locate by user & roleName
+    let resolvedUser: any = roleReq?.user || null;
+    let targetRoleName = roleReq?.roleName || bodyRoleName;
+
+    if (!resolvedUser) {
+      if (userId) {
+        resolvedUser = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { userRoles: { include: { role: true } } },
+        });
+      } else if (userEmail) {
+        resolvedUser = await prisma.user.findUnique({
+          where: { email: userEmail },
+          include: { userRoles: { include: { role: true } } },
+        });
+      }
+    }
+
+    if (!roleReq && resolvedUser && targetRoleName) {
+      roleReq = await prisma.roleRequest.findFirst({
+        where: {
+          userId: resolvedUser.id,
+          OR: [
+            { roleName: targetRoleName },
+            ...(targetRoleName === 'APPROVER' ? [{ roleName: 'COURSE_CREATOR_APPROVER' }] : []),
+            ...(targetRoleName === 'COURSE_CREATOR_APPROVER' ? [{ roleName: 'APPROVER' }] : []),
+          ],
+          status: 'PENDING',
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { user: true },
+      });
+    }
+
+    // If still no user found, return error
+    if (!resolvedUser && !roleReq) {
+      return NextResponse.json({ error: 'ไม่พบข้อมูลคำขอหรือผู้ใช้งานที่ระบุ' }, { status: 404 });
+    }
+
+    const finalUserId = resolvedUser?.id || roleReq?.userId;
+    const finalRoleName = targetRoleName || roleReq?.roleName || 'PROFESSOR';
+    const finalRequestType = roleReq?.requestType || 'GRANT';
 
     let reviewerId = null;
     if (reviewerEmail) {
@@ -260,7 +322,7 @@ export async function PATCH(request: Request) {
 
     if (action === 'APPROVE') {
       // Find role in DB with alias fallback (APPROVER -> COURSE_CREATOR_APPROVER)
-      let roleNameToFind = roleReq.roleName;
+      let roleNameToFind = finalRoleName;
       if (roleNameToFind === 'APPROVER') roleNameToFind = 'COURSE_CREATOR_APPROVER';
 
       let dbRole = await prisma.role.findUnique({ where: { name: roleNameToFind } });
@@ -269,7 +331,7 @@ export async function PATCH(request: Request) {
           where: {
             OR: [
               { name: roleNameToFind },
-              { name: roleReq.roleName },
+              { name: finalRoleName },
               { name: 'COURSE_CREATOR_APPROVER' },
             ],
           },
@@ -277,81 +339,162 @@ export async function PATCH(request: Request) {
       }
 
       if (!dbRole) {
-        return NextResponse.json({ error: `ไม่พบ Role ${roleReq.roleName} ในฐานข้อมูล` }, { status: 400 });
+        // Create role if missing
+        try {
+          dbRole = await prisma.role.create({
+            data: {
+              name: roleNameToFind,
+              description: roleNameToFind,
+            },
+          });
+        } catch {}
       }
 
-      if (roleReq.requestType === 'GRANT') {
-        // Assign role if not exists
-        const exists = await prisma.userRole.findUnique({
-          where: {
-            userId_roleId: {
-              userId: roleReq.userId,
-              roleId: dbRole.id,
+      if (dbRole && finalUserId) {
+        if (finalRequestType === 'GRANT') {
+          // Assign role if not exists
+          const exists = await prisma.userRole.findUnique({
+            where: {
+              userId_roleId: {
+                userId: finalUserId,
+                roleId: dbRole.id,
+              },
             },
-          },
-        });
+          });
 
-        if (!exists) {
-          await prisma.userRole.create({
-            data: {
-              userId: roleReq.userId,
+          if (!exists) {
+            await prisma.userRole.create({
+              data: {
+                userId: finalUserId,
+                roleId: dbRole.id,
+              },
+            });
+          }
+        } else if (finalRequestType === 'REVOKE') {
+          // Remove role
+          await prisma.userRole.deleteMany({
+            where: {
+              userId: finalUserId,
               roleId: dbRole.id,
             },
           });
         }
-      } else if (roleReq.requestType === 'REVOKE') {
-        // Remove role
-        await prisma.userRole.deleteMany({
-          where: {
-            userId: roleReq.userId,
-            roleId: dbRole.id,
+      }
+
+      // Update the request record (or create one if it was missing)
+      let updated = null;
+      if (roleReq?.id) {
+        updated = await prisma.roleRequest.update({
+          where: { id: roleReq.id },
+          data: {
+            status: 'APPROVED',
+            reviewerId,
+            reviewNote: reviewNote || 'นายทะเบียนอนุมัติคำขอแล้ว',
+          },
+        });
+      } else if (finalUserId) {
+        updated = await prisma.roleRequest.create({
+          data: {
+            userId: finalUserId,
+            roleName: finalRoleName,
+            requestType: finalRequestType,
+            status: 'APPROVED',
+            reviewerId,
+            reviewNote: reviewNote || 'นายทะเบียนอนุมัติคำขอแล้ว',
           },
         });
       }
 
-      const updated = await prisma.roleRequest.update({
-        where: { id: requestId },
-        data: {
-          status: 'APPROVED',
-          reviewerId,
-          reviewNote: reviewNote || 'นายทะเบียนอนุมัติคำขอแล้ว',
-        },
+      // Also clean up any other pending duplicate requests for this user & role
+      if (finalUserId) {
+        await prisma.roleRequest.updateMany({
+          where: {
+            userId: finalUserId,
+            roleName: { in: [finalRoleName, roleNameToFind, 'APPROVER', 'COURSE_CREATOR_APPROVER'] },
+            status: 'PENDING',
+          },
+          data: {
+            status: 'APPROVED',
+            reviewerId,
+            reviewNote: reviewNote || 'นายทะเบียนอนุมัติคำขอแล้ว',
+          },
+        });
+      }
+
+      // Fetch fresh updated roles for this user
+      const freshUser = await prisma.user.findUnique({
+        where: { id: finalUserId },
+        include: { userRoles: { include: { role: true } } },
       });
+      const updatedRoles = freshUser?.userRoles.map((ur) => ur.role.name) || [];
+      if (!updatedRoles.includes(roleNameToFind) && finalRequestType === 'GRANT') {
+        updatedRoles.push(roleNameToFind);
+      }
 
       // Send notification to user
-      await prisma.notification.create({
-        data: {
-          userId: roleReq.userId,
-          title: `คำขอสิทธิ์ ${roleReq.roleName} ได้รับการอนุมัติแล้ว`,
-          message: roleReq.requestType === 'GRANT'
-            ? `ยินดีด้วย! คุณได้รับสิทธิ์บทบาท ${roleReq.roleName} แล้ว สามารถสลับโหมดใช้งานได้จากเมนูโปรไฟล์ทันที`
-            : `คำขอยกเลิกบทบาท ${roleReq.roleName} ได้รับการอนุมัติแล้ว`,
-          type: 'SUCCESS',
-        },
-      });
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: finalUserId,
+            title: `คำขอสิทธิ์ ${finalRoleName} ได้รับการอนุมัติแล้ว`,
+            message: finalRequestType === 'GRANT'
+              ? `ยินดีด้วย! คุณได้รับสิทธิ์บทบาท ${finalRoleName} แล้ว สามารถสลับโหมดใช้งานได้จากเมนูโปรไฟล์ทันที`
+              : `คำขอยกเลิกบทบาท ${finalRoleName} ได้รับการอนุมัติแล้ว`,
+            type: 'SUCCESS',
+          },
+        });
+      } catch {}
 
-      return NextResponse.json({ message: 'อนุมัติคำขอเรียบร้อยแล้ว', request: updated });
+      return NextResponse.json({
+        message: 'อนุมัติคำขอเรียบร้อยแล้ว',
+        request: updated,
+        roles: updatedRoles,
+        success: true,
+      });
     } else if (action === 'REJECT') {
-      const updated = await prisma.roleRequest.update({
-        where: { id: requestId },
-        data: {
-          status: 'REJECTED',
-          reviewerId,
-          reviewNote: reviewNote || 'นายทะเบียนปฏิเสธคำขอ',
-        },
-      });
+      let updated = null;
+      if (roleReq?.id) {
+        updated = await prisma.roleRequest.update({
+          where: { id: roleReq.id },
+          data: {
+            status: 'REJECTED',
+            reviewerId,
+            reviewNote: reviewNote || 'นายทะเบียนปฏิเสธคำขอ',
+          },
+        });
+      }
 
-      // Send notification to user
-      await prisma.notification.create({
-        data: {
-          userId: roleReq.userId,
-          title: `คำขอสิทธิ์ ${roleReq.roleName} ไม่ผ่านการอนุมัติ`,
-          message: `คำขอสิทธิ์บทบาท ${roleReq.roleName} ของคุณถูกปฏิเสธ: ${reviewNote || 'ไม่ระบุเหตุผล'}`,
-          type: 'WARNING',
-        },
-      });
+      if (finalUserId) {
+        await prisma.roleRequest.updateMany({
+          where: {
+            userId: finalUserId,
+            roleName: { in: [finalRoleName, 'APPROVER', 'COURSE_CREATOR_APPROVER'] },
+            status: 'PENDING',
+          },
+          data: {
+            status: 'REJECTED',
+            reviewerId,
+            reviewNote: reviewNote || 'นายทะเบียนปฏิเสธคำขอ',
+          },
+        });
 
-      return NextResponse.json({ message: 'ปฏิเสธคำขอเรียบร้อยแล้ว', request: updated });
+        try {
+          await prisma.notification.create({
+            data: {
+              userId: finalUserId,
+              title: `คำขอสิทธิ์ ${finalRoleName} ไม่ผ่านการอนุมัติ`,
+              message: `คำขอสิทธิ์บทบาท ${finalRoleName} ของคุณถูกปฏิเสธ: ${reviewNote || 'ไม่ระบุเหตุผล'}`,
+              type: 'WARNING',
+            },
+          });
+        } catch {}
+      }
+
+      return NextResponse.json({
+        message: 'ปฏิเสธคำขอเรียบร้อยแล้ว',
+        request: updated,
+        success: true,
+      });
     }
 
     return NextResponse.json({ error: 'Action ไม่ถูกต้อง' }, { status: 400 });

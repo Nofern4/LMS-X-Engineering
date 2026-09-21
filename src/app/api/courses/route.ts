@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { enforceReadOnlyIfDirector, logAuditEvent } from '@/lib/rbac';
 import { AuthenticatedUser } from '@/lib/auth';
+import { getCacheEntry, setCacheEntry, clearCourseCache as clearCache } from '@/lib/courseCache';
 
 export async function GET(request: Request) {
   try {
@@ -13,6 +14,16 @@ export async function GET(request: Request) {
     const status = searchParams.get('status') || '';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
+
+    // Never cache PENDING_APPROVAL queries so approvers always see live real-time state
+    const isApprovalQuery = status === 'PENDING_APPROVAL';
+    const cacheKey = `${search}_${searchType}_${category}_${semester}_${status}_${page}_${limit}`;
+    if (!isApprovalQuery) {
+      const cached = getCacheEntry(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return NextResponse.json(cached.data);
+      }
+    }
 
     const skip = (page - 1) * limit;
 
@@ -65,7 +76,7 @@ export async function GET(request: Request) {
               id: true,
               studentId: true,
               status: true,
-              student: { select: { id: true, email: true, name: true } },
+              student: { select: { email: true } },
             },
           },
           _count: { select: { enrollments: true, materials: true } },
@@ -74,7 +85,7 @@ export async function GET(request: Request) {
       prisma.course.count({ where }),
     ]);
 
-    return NextResponse.json({
+    const result = {
       courses,
       pagination: {
         page,
@@ -82,7 +93,14 @@ export async function GET(request: Request) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    };
+
+    // Cache result for 4 seconds to collapse simultaneous requests into 1 DB query
+    if (!isApprovalQuery) {
+      setCacheEntry(cacheKey, result, 4000);
+    }
+
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error('Get courses error:', error);
     return NextResponse.json({ 
@@ -92,6 +110,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  clearCache(); // invalidate cache on new course creation
   try {
     const body = await request.json();
     const {
