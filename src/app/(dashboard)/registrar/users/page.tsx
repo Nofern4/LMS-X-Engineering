@@ -128,13 +128,42 @@ function RegistrarUsersContent() {
 
   const fetchRoleRequests = () => {
     setIsLoadingRequests(true);
-    fetch('/api/roles/request?all=true')
+    // Fetch only PENDING requests to avoid stale 400 issues
+    fetch('/api/roles/request?all=true&status=PENDING')
       .then((r) => r.json())
       .then((d) => {
         setRoleRequests(deduplicateRequests(d.requests || []));
       })
       .catch((err) => console.error(err))
       .finally(() => setIsLoadingRequests(false));
+  };
+
+  const handleRevokeRole = async (targetUser: any, roleName: string) => {
+    if (!confirm(`ยืนยันการยกเลิกสิทธิ์ "${roleName}" ของ ${targetUser.name}?`)) return;
+    setRequestFeedback(null);
+    try {
+      const res = await fetch('/api/roles/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: targetUser.id,
+          roleName,
+          requestType: 'REVOKE',
+          instantRevoke: true,
+          reason: 'นายทะเบียนยกเลิกสิทธิ์โดยตรง',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRequestFeedback({ type: 'error', text: data.error || 'เกิดข้อผิดพลาดในการยกเลิกสิทธิ์' });
+      } else {
+        setRequestFeedback({ type: 'success', text: `ยกเลิกสิทธิ์ ${roleName} ของ ${targetUser.name} เรียบร้อยแล้ว` });
+        fetchUsers();
+        if (editingUser?.id === targetUser.id) setEditingUser(null);
+      }
+    } catch (e) {
+      setRequestFeedback({ type: 'error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+    }
   };
 
   useEffect(() => {
@@ -783,12 +812,22 @@ function RegistrarUsersContent() {
                 </div>
 
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-bold mb-1">สิทธิ์ปัจจุบันที่ถือครอง:</span>
-                  <div className="flex flex-wrap gap-1">
+                  <span className="text-slate-400 block text-[10px] font-bold mb-1">สิทธิ์ปัจจุบัน (คลิก ✕ เพื่อยกเลิกสิทธิ์):</span>
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedRoles.map((r) => (
-                      <Badge key={r} variant={getRoleBadgeVariant(r)} size="sm">
-                        {r}
-                      </Badge>
+                      <span key={r} className="inline-flex items-center gap-1.5">
+                        <Badge variant={getRoleBadgeVariant(r)} size="sm">{r}</Badge>
+                        {r !== 'STUDENT' && selectedRoles.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeRole(editingUser, r)}
+                            className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors flex items-center justify-center text-[10px] font-black leading-none"
+                            title={`ยกเลิกสิทธิ์ ${r}`}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </span>
                     ))}
                   </div>
                 </div>

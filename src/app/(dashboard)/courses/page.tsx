@@ -59,7 +59,7 @@ export default function GlobalCoursesCatalogPage() {
   };
 
   const fetchCoursesList = () => {
-    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}`)
+    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}&status=PUBLISHED`)
       .then((r) => r.json())
       .then((d) => {
         const list: any[] = d.courses || [];

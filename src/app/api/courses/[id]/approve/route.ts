@@ -21,22 +21,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const nextStatus = action === 'APPROVE' ? 'PUBLISHED' : 'REJECTED';
 
+    // Verify course exists first
+    const existingCourse = await prisma.course.findUnique({ where: { id } });
+    if (!existingCourse) {
+      return NextResponse.json({ error: `ไม่พบรายวิชา ID: ${id}` }, { status: 404 });
+    }
+
     const updated = await prisma.course.update({
       where: { id },
       data: {
         status: nextStatus,
-        rejectionReason: action === 'REJECT' ? rejectionReason || 'ข้อมูลวิชาไม่สมบูรณ์' : null
-      }
+        rejectionReason: action === 'REJECT' ? (rejectionReason || 'ข้อมูลวิชาไม่สมบูรณ์') : null,
+      },
     });
 
     clearCourseCache();
 
-    let auditUserId = user?.id;
-    if (auditUserId) {
-      const dbUser = await prisma.user.findUnique({ where: { id: auditUserId } });
-      if (!dbUser) auditUserId = null;
+    // Audit log — skip if user ID doesn't exist in DB (avoids crash)
+    try {
+      let auditUserId: string | null = user?.id || null;
+      if (auditUserId) {
+        const dbUser = await prisma.user.findUnique({ where: { id: auditUserId } });
+        if (!dbUser) auditUserId = null;
+      }
+      await logAuditEvent(auditUserId, `COURSE_DECISION_${action}`, `COURSE:${id}`, undefined, { rejectionReason });
+    } catch (auditErr) {
+      console.warn('Audit log skipped:', auditErr);
     }
-    await logAuditEvent(auditUserId, `COURSE_DECISION_${action}`, `COURSE:${id}`, undefined, { rejectionReason });
 
     return NextResponse.json({
       message: action === 'APPROVE' ? 'อนุมัติการสร้างรายวิชาเรียบร้อยแล้ว' : 'ไม่อนุมัติการสร้างรายวิชา',
@@ -44,7 +55,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       success: true,
     });
   } catch (error: any) {
-    console.error('Approve course error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
+    console.error('Approve course error:', error?.message || error);
+    return NextResponse.json({
+      error: `เกิดข้อผิดพลาด: ${error?.message || 'กรุณาลองใหม่อีกครั้ง'}`,
+    }, { status: 500 });
   }
 }

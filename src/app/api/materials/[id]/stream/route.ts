@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -16,101 +14,128 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'ไม่พบสื่อการเรียนรู้' }, { status: 404 });
     }
 
-    const FALLBACK_PLAYABLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const fp = material.filePath || '';
 
-    if (material.filePath && (material.filePath.startsWith('http://') || material.filePath.startsWith('https://'))) {
-      return NextResponse.redirect(material.filePath);
+    // 1. External URL (YouTube, Google Drive, etc.) → redirect
+    if (fp.startsWith('http://') || fp.startsWith('https://')) {
+      return NextResponse.redirect(fp);
     }
 
-    if (!material.filePath || material.filePath.startsWith('blob:')) {
-      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
-    }
+    // 2. Base64 data URL stored directly in DB → decode and stream
+    if (fp.startsWith('data:')) {
+      const matches = fp.match(/^data:([^;]+);base64,(.+)$/s);
+      if (matches) {
+        const contentType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        const range = request.headers.get('range');
 
-    // Clean filePath to remove leading slashes or 'uploads/'
-    let cleanRelPath = material.filePath.replace(/^\/?uploads\/?/, '').replace(/^\//, '');
+        if (range && contentType.startsWith('video/')) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : buffer.length - 1;
+          const chunk = buffer.slice(start, end + 1);
+          return new Response(chunk, {
+            status: 206,
+            headers: {
+              'Content-Range': `bytes ${start}-${end}/${buffer.length}`,
+              'Accept-Ranges': 'bytes',
+              'Content-Length': chunk.length.toString(),
+              'Content-Type': contentType,
+            },
+          });
+        }
 
-    // Check candidate base directories (local dev and Vercel public directory)
-    const candidateDirs = [
-      path.join(process.cwd(), 'public', 'uploads'),
-      path.resolve('./public/uploads'),
-      path.resolve(process.env.STORAGE_LOCAL_DIR || './uploads'),
-      path.join(process.cwd(), 'uploads'),
-    ];
-
-    let activeStreamPath: string | null = null;
-    let foundInPublic = false;
-
-    for (const dir of candidateDirs) {
-      const p1 = path.join(dir, cleanRelPath);
-      const p2 = path.join(dir, cleanRelPath.replace(/\.mov$/i, '.mp4'));
-      if (fs.existsSync(p2)) {
-        activeStreamPath = p2;
-        cleanRelPath = cleanRelPath.replace(/\.mov$/i, '.mp4');
-        if (dir.includes('public')) foundInPublic = true;
-        break;
+        return new Response(buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': buffer.length.toString(),
+            'Cache-Control': 'private, max-age=3600',
+          },
+        });
       }
-      if (fs.existsSync(p1)) {
-        activeStreamPath = p1;
-        if (dir.includes('public')) foundInPublic = true;
-        break;
+
+      // Malformed data URL — fallback
+      return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    }
+
+    // 3. Local filesystem path (dev only)
+    if (fp && !fp.startsWith('blob:') && !fp.includes('FILE_TOO_LARGE')) {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const candidateDirs = [
+          path.join(process.cwd(), 'public', 'uploads'),
+          path.join(process.cwd(), 'uploads'),
+        ];
+
+        let activeStreamPath: string | null = null;
+        const cleanRelPath = fp.replace(/^\/?(uploads|public)\//, '').replace(/\\/g, '/');
+
+        for (const dir of candidateDirs) {
+          const fullPath = path.join(dir, cleanRelPath);
+          if (fs.existsSync(fullPath)) {
+            activeStreamPath = fullPath;
+            break;
+          }
+          const mp4Path = fullPath.replace(/\.mov$/i, '.mp4');
+          if (fs.existsSync(mp4Path)) {
+            activeStreamPath = mp4Path;
+            break;
+          }
+        }
+
+        if (activeStreamPath) {
+          const ext = activeStreamPath.split('.').pop()?.toLowerCase() || '';
+          const mimeMap: Record<string, string> = {
+            mp4: 'video/mp4', webm: 'video/webm', mov: 'video/mp4',
+            mp3: 'audio/mpeg', pdf: 'application/pdf',
+            png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+          };
+          const contentType = mimeMap[ext] || material.mimeType || 'application/octet-stream';
+
+          const stat = fs.statSync(activeStreamPath);
+          const fileSize = stat.size;
+          const range = request.headers.get('range');
+
+          if (range) {
+            const parts = range.replace(/bytes=/, '').split('-');
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunk = (fileSize - 1);
+            const clampedEnd = Math.min(end, chunk);
+            const chunkSize = clampedEnd - start + 1;
+            const file = fs.createReadStream(activeStreamPath, { start, end: clampedEnd });
+            return new Response(file as any, {
+              status: 206,
+              headers: {
+                'Content-Range': `bytes ${start}-${clampedEnd}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunkSize.toString(),
+                'Content-Type': contentType,
+              },
+            });
+          }
+
+          const file = fs.createReadStream(activeStreamPath);
+          return new Response(file as any, {
+            status: 200,
+            headers: {
+              'Content-Length': fileSize.toString(),
+              'Content-Type': contentType,
+              'Accept-Ranges': 'bytes',
+            },
+          });
+        }
+      } catch (fsErr) {
+        console.warn('FS stream failed:', (fsErr as Error).message);
       }
     }
 
-    // If served from public, we can redirect directly to Vercel CDN static path for fastest streaming
-    if (foundInPublic) {
-      const url = new URL(`/uploads/${cleanRelPath.replace(/\\/g, '/')}`, request.url);
-      return NextResponse.redirect(url);
-    }
-
-    if (!activeStreamPath || !fs.existsSync(activeStreamPath)) {
-      return NextResponse.redirect(FALLBACK_PLAYABLE_VIDEO);
-    }
-
-    const ext = path.extname(activeStreamPath).toLowerCase();
-    const mimeMap: Record<string, string> = {
-      '.mp4': 'video/mp4',
-      '.webm': 'video/webm',
-      '.mov': 'video/mp4',
-      '.m4v': 'video/mp4',
-      '.ogv': 'video/ogg',
-      '.ogg': 'video/ogg',
-      '.mp3': 'audio/mpeg',
-      '.pdf': 'application/pdf',
-    };
-    const contentType = mimeMap[ext] || 'video/mp4';
-
-    const stat = fs.statSync(activeStreamPath);
-    const fileSize = stat.size;
-    const range = request.headers.get('range');
-
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(activeStreamPath, { start, end });
-
-      const headers = {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize.toString(),
-        'Content-Type': contentType,
-      };
-
-      // @ts-ignore - ReadableStream conversion for Web API Response
-      return new Response(file as any, { status: 206, headers });
-    } else {
-      const headers = {
-        'Content-Length': fileSize.toString(),
-        'Content-Type': contentType,
-      };
-
-      const file = fs.createReadStream(activeStreamPath);
-      // @ts-ignore
-      return new Response(file as any, { status: 200, headers });
-    }
+    // 4. Fallback — demo video
+    return NextResponse.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
   } catch (error: any) {
-    console.error('Video stream error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการสตรีมวิดีโอ' }, { status: 500 });
+    console.error('Stream error:', error?.message || error);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการสตรีมสื่อ' }, { status: 500 });
   }
 }
