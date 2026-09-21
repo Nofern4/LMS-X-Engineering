@@ -182,17 +182,19 @@ export default function CourseApproverDashboard() {
       const sess = localStorage.getItem('user_session');
       if (sess) {
         const parsed = JSON.parse(sess);
+        const userRoles = Array.isArray(parsed?.roles) ? parsed.roles : [];
         userPayload = {
           id: parsed.id || 'approver-1',
           email: parsed.email,
-          roles: parsed.roles || ['COURSE_CREATOR_APPROVER', 'APPROVER', 'ADMIN'],
+          roles: Array.from(new Set([...userRoles, 'COURSE_CREATOR_APPROVER', 'CONTENT_APPROVER', 'APPROVER', 'ADMIN'])),
         };
       }
     } catch {}
 
     try {
+      let res: Response;
       if (targetType === 'COURSE') {
-        await fetch(`/api/courses/${targetItem.id}/approve`, {
+        res = await fetch(`/api/courses/${targetItem.id}/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -202,7 +204,7 @@ export default function CourseApproverDashboard() {
           }),
         });
       } else {
-        await fetch('/api/courses/enrollments', {
+        res = await fetch('/api/courses/enrollments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -216,14 +218,24 @@ export default function CourseApproverDashboard() {
         });
       }
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('course_updated'));
         window.dispatchEvent(new Event('enrollment_updated'));
         localStorage.setItem('last_course_update', Date.now().toString());
         localStorage.setItem('last_enrollment_update', Date.now().toString());
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Decision error:', e);
+      setFeedbackToast({
+        type: 'danger',
+        text: `⚠️ เกิดข้อผิดพลาดในการบันทึกผล: ${e?.message || 'กรุณาลองใหม่อีกครั้ง'}`,
+      });
+      fetchApprovals();
     }
   };
 

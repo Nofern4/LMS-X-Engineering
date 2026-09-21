@@ -59,7 +59,10 @@ export default function GlobalCoursesCatalogPage() {
   };
 
   const fetchCoursesList = () => {
-    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}&status=PUBLISHED`)
+    fetch(`/api/courses?search=${encodeURIComponent(search)}&searchType=${searchType}&semester=${encodeURIComponent(semester)}&status=PUBLISHED&_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' },
+    })
       .then((r) => r.json())
       .then((d) => {
         const list: any[] = d.courses || [];
@@ -88,11 +91,25 @@ export default function GlobalCoursesCatalogPage() {
 
   useEffect(() => {
     fetchCoursesList();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'last_course_update' || e.key === 'last_enrollment_update' || e.key === 'course_updated') {
+        fetchCoursesList();
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCoursesList();
+      }
+    };
     window.addEventListener('course_updated', fetchCoursesList);
     window.addEventListener('enrollment_updated', fetchCoursesList);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       window.removeEventListener('course_updated', fetchCoursesList);
       window.removeEventListener('enrollment_updated', fetchCoursesList);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [search, searchType, semester]);
 
